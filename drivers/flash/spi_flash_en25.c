@@ -12,19 +12,15 @@
 
 LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 
-/* AT45 commands used by this driver: */
+/* EN25 commands used by this driver: */
 /* - Continuous Array Read (Low Power Mode) */
-#define CMD_READ		0x01
+#define CMD_READ		0x03    // Changed, you need to test
 /* - Main Memory Byte/Page Program through Buffer 1 without Built-In Erase */
 #define CMD_WRITE		0x02
 /* - Read-Modify-Write */
 #define CMD_MODIFY		0x58
 /* - Manufacturer and Device ID Read */
 #define CMD_READ_ID		0x9F
-/* - Status Register Read */
-#define CMD_READ_STATUS		0xD7
-/* - Chip Erase */
-#define CMD_CHIP_ERASE		{ 0xC7, 0x94, 0x80, 0x9A }
 /* - Sector Erase */
 #define CMD_SECTOR_ERASE	0x7C
 /* - Block Erase */
@@ -38,9 +34,21 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 /* - Ultra-Deep Power-Down */
 #define CMD_ENTER_UDPD		0x79
 /* - Buffer and Page Size Configuration, "Power of 2" binary page size */
-#define CMD_BINARY_PAGE_SIZE	{ 0x3D, 0x2A, 0x80, 0xA6 }
+#define CMD_BINARY_PAGE_SIZE	{ 0x3D, 0x2A, 0x80, 0xA6 } //should not be needed
 
-#define STATUS_REG_LSB_RDY_BUSY_BIT	0x80
+/* ------------------------------*/
+/* New commmads*/
+
+/* - Write Enable Command */
+#define CMD_WRITE_ENABLE    0x06
+/* - Status Register Read Command*/
+#define CMD_READ_STATUS		0x05
+/* - Chip Erase */
+#define CMD_CHIP_ERASE      0xC7 /* It could also be 0x60 */
+
+
+#define STATUS_REG_WRITE_IN_PROGRESS	0x01
+
 #define STATUS_REG_LSB_PAGE_SIZE_BIT	0x01
 
 
@@ -149,12 +157,9 @@ static int check_jedec_id(const struct device *dev)
 }
 
 /*
- * Reads 2-byte Status Register:
- * - Byte 0 to LSB
- * - Byte 1 to MSB
- * of the pointed parameter.
+ * Reads 1-byte Status Register
  */
-static int read_status_register(const struct device *dev, uint16_t *status)
+static int read_status_register(const struct device *dev, uint8_t *status)
 {
 	int err;
 	const uint8_t opcode = CMD_READ_STATUS;
@@ -170,7 +175,7 @@ static int read_status_register(const struct device *dev, uint16_t *status)
 		},
 		{
 			.buf = status,
-			.len = sizeof(uint16_t),
+			.len = sizeof(uint8_t),
 		}
 	};
 	DEF_BUF_SET(tx_buf_set, tx_buf);
@@ -192,11 +197,11 @@ static int read_status_register(const struct device *dev, uint16_t *status)
 static int wait_until_ready(const struct device *dev)
 {
 	int err;
-	uint16_t status;
+	uint8_t status;
 
 	do {
 		err = read_status_register(dev, &status);
-	} while (err == 0 && !(status & STATUS_REG_LSB_RDY_BUSY_BIT));
+	} while (err == 0 && (status & STATUS_REG_WRITE_IN_PROGRESS));
 
 	return err;
 }
@@ -204,7 +209,7 @@ static int wait_until_ready(const struct device *dev)
 static int configure_page_size(const struct device *dev)
 {
 	int err;
-	uint16_t status;
+	uint8_t status;
 	uint8_t const conf_binary_page_size[] = CMD_BINARY_PAGE_SIZE;
 	const struct spi_buf tx_buf[] = {
 		{
@@ -366,10 +371,48 @@ static int spi_flash_at45_write(const struct device *dev, off_t offset,
 	return err;
 }
 
+static int send_cmd_op(const struct device *dev, uint8_t opcode,
+			 uint32_t delay)
+{
+	int err = 0;
+	const struct spi_buf tx_buf[] = {
+		{
+			.buf = (void *)&opcode,
+			.len = sizeof(opcode),
+		}
+	};
+	DEF_BUF_SET(tx_buf_set, tx_buf);
+
+	err = spi_write(get_dev_data(dev)->spi,
+			&get_dev_config(dev)->spi_cfg,
+			&tx_buf_set);
+
+	if (err != 0) {
+		LOG_ERR("SPI transaction failed with code: %d/%u", err, __LINE__);
+		return -EIO;
+	}
+
+	k_busy_wait(delay);
+	return 0;
+}
+
+static int set_write_enable(const struct device *dev)
+{
+    /* We add minimal delay of one microsecond, although datasheet says
+     * that it could be 30ns. */
+    return send_cmd_op(dev, CMD_WRITE_ENABLE, 1);
+}
+
 static int perform_chip_erase(const struct device *dev)
 {
-	int err;
-	uint8_t const chip_erase_cmd[] = CMD_CHIP_ERASE;
+	LOG_INF("Entered perform chip erase function\n");
+    int err;
+    err = set_write_enable(dev);
+	if (err != 0) {
+        return err;
+    }
+
+	uint8_t const chip_erase_cmd = CMD_CHIP_ERASE;
 	const struct spi_buf tx_buf[] = {
 		{
 			.buf = (void *)&chip_erase_cmd,
@@ -385,7 +428,9 @@ static int perform_chip_erase(const struct device *dev)
 		LOG_ERR("SPI transaction failed with code: %d/%u",
 			err, __LINE__);
 	} else {
+		LOG_INF("Full chip erase started, waiting for it to end\n");
 		err = wait_until_ready(dev);
+		LOG_INF("Full chip erase finished!\n");
 	}
 
 	return (err != 0) ? -EIO : 0;
@@ -515,40 +560,12 @@ static void spi_flash_at45_pages_layout(const struct device *dev,
 }
 #endif /* IS_ENABLED(CONFIG_FLASH_PAGE_LAYOUT) */
 
-static int power_down_op(const struct device *dev, uint8_t opcode,
-			 uint32_t delay)
-{
-	int err = 0;
-	const struct spi_buf tx_buf[] = {
-		{
-			.buf = (void *)&opcode,
-			.len = sizeof(opcode),
-		}
-	};
-	DEF_BUF_SET(tx_buf_set, tx_buf);
-
-	err = spi_write(get_dev_data(dev)->spi,
-			&get_dev_config(dev)->spi_cfg,
-			&tx_buf_set);
-	if (err != 0) {
-		LOG_ERR("SPI transaction failed with code: %d/%u",
-			err, __LINE__);
-		return -EIO;
-	}
-
-
-	k_busy_wait(delay);
-	return 0;
-}
 
 static int spi_flash_at45_init(const struct device *dev)
 {
 	struct spi_flash_at45_data *dev_data = get_dev_data(dev);
 	const struct spi_flash_at45_config *dev_config = get_dev_config(dev);
 	int err;
-
-	LOG_ERR("STARTING MY INIT");
-	printk("STARTING MY INIT");
 
 	dev_data->spi = device_get_binding(dev_config->spi_bus);
 	if (!dev_data->spi) {
@@ -577,15 +594,22 @@ static int spi_flash_at45_init(const struct device *dev)
 	 * is asserted for a certain time, so issuing the Resume from Deep
 	 * Power-Down command will work in both cases.
 	 */
-	power_down_op(dev, CMD_EXIT_DPD, dev_config->t_exit_dpd);
+	send_cmd_op(dev, CMD_EXIT_DPD, dev_config->t_exit_dpd);
 
 	err = check_jedec_id(dev);
-	if (err == 0) {
-		err = configure_page_size(dev);
-	}
+
+    // TODO: en25 flash chip does not have option to 
+    // set page size to the power of 2, so we skip this step.
+    // Since the page size is already 256 bytes this might not be problem
+    // Fri 08 Jan 2021 12:58:29 CET
+    //
+	//if (err == 0) {
+	//    printk("STARTING MY INIT3\n");
+	//	err = configure_page_size(dev);
+	//    printk("STARTING MY INIT4\n");
+	//}
 
 	release(dev);
-
 	return err;
 }
 
@@ -605,7 +629,7 @@ static int spi_flash_at45_pm_control(const struct device *dev,
 			switch (new_state) {
 			case DEVICE_PM_ACTIVE_STATE:
 				acquire(dev);
-				power_down_op(dev, CMD_EXIT_DPD,
+				send_cmd_op(dev, CMD_EXIT_DPD,
 					      dev_config->t_exit_dpd);
 				release(dev);
 				break;
@@ -614,7 +638,7 @@ static int spi_flash_at45_pm_control(const struct device *dev,
 			case DEVICE_PM_SUSPEND_STATE:
 			case DEVICE_PM_OFF_STATE:
 				acquire(dev);
-				power_down_op(dev,
+				send_cmd_op(dev,
 					dev_config->use_udpd ? CMD_ENTER_UDPD
 							     : CMD_ENTER_DPD,
 					dev_config->t_enter_dpd);

@@ -4081,7 +4081,7 @@
 #define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_P_cs_gpios_IDX_0_PH DT_N_S_soc_S_peripheral_40000000_S_gpio_842500
 #define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_P_cs_gpios_IDX_0_VAL_pin 2
 #define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_P_cs_gpios_IDX_0_VAL_pin_EXISTS 1
-#define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_P_cs_gpios_IDX_0_VAL_flags 0
+#define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_P_cs_gpios_IDX_0_VAL_flags 1
 #define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_P_cs_gpios_IDX_0_VAL_flags_EXISTS 1
 #define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_P_cs_gpios_LEN 1
 #define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_P_cs_gpios_EXISTS 1
@@ -4132,10 +4132,10 @@
 #define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_STATUS_okay 1
 
 /* Generic property macros: */
-#define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_P_jedec_id {0 /* 0x0 */, 0 /* 0x0 */, 0 /* 0x0 */}
-#define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_P_jedec_id_IDX_0 0
-#define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_P_jedec_id_IDX_1 0
-#define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_P_jedec_id_IDX_2 0
+#define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_P_jedec_id {28 /* 0x1c */, 112 /* 0x70 */, 22 /* 0x16 */}
+#define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_P_jedec_id_IDX_0 28
+#define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_P_jedec_id_IDX_1 112
+#define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_P_jedec_id_IDX_2 22
 #define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_P_jedec_id_LEN 3
 #define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_P_jedec_id_EXISTS 1
 #define DT_N_S_soc_S_peripheral_40000000_S_spi_b000_S_en25qh32b_0_P_size 33554432

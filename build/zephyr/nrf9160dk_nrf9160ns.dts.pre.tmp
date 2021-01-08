@@ -574,13 +574,13 @@ timer2: timer@11000 {
     sck-pin = < 28 >;
     mosi-pin = < 29 >;
     miso-pin = < 27 >;
-    cs-gpios = <&gpio0 2 0>;
+    cs-gpios = <&gpio0 2 1>;
     flash42: en25qh32b@0 {
         reg = <0>;
         label = "EN25QH32B";
         status = "okay";
         compatible = "atmel,at45";
-        jedec-id = [00 00 00];
+        jedec-id = [1c 70 16];
         size = <33554432>;
         sector-size = <4096>;
         block-size = <4096>;

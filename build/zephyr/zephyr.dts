@@ -294,13 +294,13 @@
 				sck-pin = < 0x1c >;
 				mosi-pin = < 0x1d >;
 				miso-pin = < 0x1b >;
-				cs-gpios = < &gpio0 0x2 0x0 >;
+				cs-gpios = < &gpio0 0x2 0x1 >;
 				flash42: en25qh32b@0 {
 					reg = < 0x0 >;
 					label = "EN25QH32B";
 					status = "okay";
 					compatible = "atmel,at45";
-					jedec-id = [ 00 00 00 ];
+					jedec-id = [ 1C 70 16 ];
 					size = < 0x2000000 >;
 					sector-size = < 0x1000 >;
 					block-size = < 0x1000 >;

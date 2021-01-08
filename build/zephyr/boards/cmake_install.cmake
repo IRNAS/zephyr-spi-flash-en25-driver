@@ -34,7 +34,7 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/skobec/work/zephyr-spi-flash-en25-driver/build/zephyr/boards/arm/nrf9160dk_nrf9160/cmake_install.cmake")
+  include("/home/skobec/work/zephyr-spi-flash-en25-driver/build/zephyr/boards/boards/arm/nrf9160dk_nrf9160ns/cmake_install.cmake")
 
 endif()
 

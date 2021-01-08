@@ -9,7 +9,7 @@
     sck-pin = < 28 >;
     mosi-pin = < 29 >;
     miso-pin = < 27 >;
-    cs-gpios = <&gpio0 2 0>;
+    cs-gpios = <&gpio0 2 1>;
 
     flash42: en25qh32b@0 {
         // We leave adesto and at45 as these values are defined in .yml files and
@@ -21,7 +21,7 @@
         //compatible = "esmt,en25"; // No device binding
         compatible = "atmel,at45";
 
-        jedec-id = [00 00 00];  //Check this
+        jedec-id = [1c 70 16];  //Check this
         size = <33554432>;
         sector-size = <4096>;
         block-size = <4096>;
