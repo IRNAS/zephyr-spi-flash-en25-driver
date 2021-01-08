@@ -13,20 +13,7 @@
 LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 
 /* EN25 commands used by this driver: */
-/* - Continuous Array Read (Low Power Mode) */
-#define CMD_READ		0x03    // Changed, you need to test
 /* - Main Memory Byte/Page Program through Buffer 1 without Built-In Erase */
-#define CMD_WRITE		0x02
-/* - Read-Modify-Write */
-#define CMD_MODIFY		0x58
-/* - Manufacturer and Device ID Read */
-#define CMD_READ_ID		0x9F
-/* - Sector Erase */
-#define CMD_SECTOR_ERASE	0x7C
-/* - Block Erase */
-#define CMD_BLOCK_ERASE		0x50
-/* - Page Erase */
-#define CMD_PAGE_ERASE		0x81
 /* - Deep Power-Down */
 #define CMD_ENTER_DPD		0xB9
 /* - Resume from Deep Power-Down */
@@ -39,12 +26,33 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 /* ------------------------------*/
 /* New commmads*/
 
+/* - Reset Enable Command */
+#define CMD_RESET_ENABLE        0x66
+/* - Reset Command */
+#define CMD_RESET               0x99
 /* - Write Enable Command */
-#define CMD_WRITE_ENABLE    0x06
-/* - Status Register Read Command*/
-#define CMD_READ_STATUS		0x05
-/* - Chip Erase */
-#define CMD_CHIP_ERASE      0xC7 /* It could also be 0x60 */
+#define CMD_WRITE_ENABLE        0x06
+/* - Manufacturer and Device ID Read */
+#define CMD_READ_ID		        0x9F
+/* - Status Register Read Command */
+#define CMD_READ_STATUS		    0x05
+/* - Chip Erase Command */
+#define CMD_READ		        0x03    
+/* - Page Program (Continuous Write) Command */
+#define CMD_PAGE_PROGRAM	    0x02
+/* - Chip erase Command */
+#define CMD_CHIP_ERASE          0xC7            /* It could also be 0x60 */
+/* - Sector Erase Command */
+#define CMD_SECTOR_ERASE	    0x20
+/* - Full Block Erase (64KB) Command */
+#define CMD_FULL_BLOCK_ERASE    0xD8
+/* - Full Block Erase (64KB) Command */
+#define CMD_HALF_BLOCK_ERASE	0x52
+/* - Page Erase */
+#define CMD_PAGE_ERASE		    0x81
+
+
+
 
 
 #define STATUS_REG_WRITE_IN_PROGRESS	0x01
@@ -52,10 +60,10 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 #define STATUS_REG_LSB_PAGE_SIZE_BIT	0x01
 
 
-#define DEF_BUF_SET(_name, _buf_array) \
-	const struct spi_buf_set _name = { \
-		.buffers = _buf_array, \
-		.count   = ARRAY_SIZE(_buf_array), \
+#define DEF_BUF_SET(_name, _buf_array)      \
+	const struct spi_buf_set _name = {      \
+		.buffers = _buf_array,              \
+		.count   = ARRAY_SIZE(_buf_array),  \
 	}
 
 struct spi_flash_at45_data {
@@ -96,7 +104,8 @@ static struct spi_flash_at45_data *get_dev_data(const struct device *dev)
 	return dev->data;
 }
 
-static const struct spi_flash_at45_config *get_dev_config(const struct device *dev)
+static const struct 
+spi_flash_at45_config *get_dev_config(const struct device *dev)
 {
 	return dev->config;
 }
@@ -244,6 +253,57 @@ static int configure_page_size(const struct device *dev)
 	return (err != 0) ? -EIO : 0;
 }
 
+static int send_cmd_op(const struct device *dev, uint8_t opcode,
+			 uint32_t delay)
+{
+	int err = 0;
+	const struct spi_buf tx_buf[] = {
+		{
+			.buf = (void *)&opcode,
+			.len = sizeof(opcode),
+		}
+	};
+	DEF_BUF_SET(tx_buf_set, tx_buf);
+
+	err = spi_write(get_dev_data(dev)->spi,
+			&get_dev_config(dev)->spi_cfg,
+			&tx_buf_set);
+
+	if (err != 0) {
+		LOG_ERR("SPI transaction failed with code: %d/%u", err, __LINE__);
+		return -EIO;
+	}
+
+	k_busy_wait(delay);
+	return 0;
+}
+
+static int perform_reset_sequence(const struct device *dev)
+{
+    int err;
+    err = send_cmd_op(dev, CMD_RESET_ENABLE, 1);
+
+	if (err != 0) {
+        return err;
+	}
+
+    err = send_cmd_op(dev, CMD_RESET, 1);
+
+	if (err != 0) {
+        return err;
+	}
+
+    err = wait_until_ready(dev);
+    return err;
+}
+
+static int set_write_enable(const struct device *dev)
+{
+    /* We add minimal delay of one microsecond, although datasheet says
+     * that it could be 30ns. */
+    return send_cmd_op(dev, CMD_WRITE_ENABLE, 1);
+}
+
 static bool is_valid_request(off_t addr, size_t size, size_t chip_size)
 {
 	return (addr >= 0 && (addr + size) <= chip_size);
@@ -300,11 +360,14 @@ static int spi_flash_at45_read(const struct device *dev, off_t offset,
 static int perform_write(const struct device *dev, off_t offset,
 			 const void *data, size_t len)
 {
-	int err;
+    int err;
+    err = set_write_enable(dev);
+	if (err != 0) {
+        return err;
+    }
+
 	uint8_t const op_and_addr[] = {
-		IS_ENABLED(CONFIG_SPI_FLASH_EN25_USE_READ_MODIFY_WRITE)
-			? CMD_MODIFY
-			: CMD_WRITE,
+        CMD_PAGE_PROGRAM,
 		(offset >> 16) & 0xFF,
 		(offset >> 8)  & 0xFF,
 		(offset >> 0)  & 0xFF,
@@ -371,41 +434,9 @@ static int spi_flash_at45_write(const struct device *dev, off_t offset,
 	return err;
 }
 
-static int send_cmd_op(const struct device *dev, uint8_t opcode,
-			 uint32_t delay)
-{
-	int err = 0;
-	const struct spi_buf tx_buf[] = {
-		{
-			.buf = (void *)&opcode,
-			.len = sizeof(opcode),
-		}
-	};
-	DEF_BUF_SET(tx_buf_set, tx_buf);
-
-	err = spi_write(get_dev_data(dev)->spi,
-			&get_dev_config(dev)->spi_cfg,
-			&tx_buf_set);
-
-	if (err != 0) {
-		LOG_ERR("SPI transaction failed with code: %d/%u", err, __LINE__);
-		return -EIO;
-	}
-
-	k_busy_wait(delay);
-	return 0;
-}
-
-static int set_write_enable(const struct device *dev)
-{
-    /* We add minimal delay of one microsecond, although datasheet says
-     * that it could be 30ns. */
-    return send_cmd_op(dev, CMD_WRITE_ENABLE, 1);
-}
 
 static int perform_chip_erase(const struct device *dev)
 {
-	LOG_INF("Entered perform chip erase function\n");
     int err;
     err = set_write_enable(dev);
 	if (err != 0) {
@@ -428,9 +459,7 @@ static int perform_chip_erase(const struct device *dev)
 		LOG_ERR("SPI transaction failed with code: %d/%u",
 			err, __LINE__);
 	} else {
-		LOG_INF("Full chip erase started, waiting for it to end\n");
 		err = wait_until_ready(dev);
-		LOG_INF("Full chip erase finished!\n");
 	}
 
 	return (err != 0) ? -EIO : 0;
@@ -447,6 +476,11 @@ static int perform_erase_op(const struct device *dev, uint8_t opcode,
 			    off_t offset)
 {
 	int err;
+    err = set_write_enable(dev);
+	if (err != 0) {
+        return err;
+    }
+
 	uint8_t const op_and_addr[] = {
 		opcode,
 		(offset >> 16) & 0xFF,
@@ -504,13 +538,13 @@ static int spi_flash_at45_erase(const struct device *dev, off_t offset,
 				size   -= cfg->sector_size;
 			} else if (is_erase_possible(cfg->block_size,
 						     offset, size)) {
-				err = perform_erase_op(dev, CMD_BLOCK_ERASE,
+				err = perform_erase_op(dev, CMD_FULL_BLOCK_ERASE,
 						       offset);
 				offset += cfg->block_size;
 				size   -= cfg->block_size;
 			} else if (is_erase_possible(cfg->page_size,
 						     offset, size)) {
-				err = perform_erase_op(dev, CMD_PAGE_ERASE,
+				err = perform_erase_op(dev, CMD_HALF_BLOCK_ERASE,
 						       offset);
 				offset += cfg->page_size;
 				size   -= cfg->page_size;
@@ -587,6 +621,13 @@ static int spi_flash_at45_init(const struct device *dev)
 	}
 
 	acquire(dev);
+
+    /* Perform reset sequence as we have seen that fetching
+     * JEDEC ID failed otherwise. */
+    err =  perform_reset_sequence(dev);
+    if (err != 0) {
+        return err;
+    }
 
 	/* Just in case the chip was in the Deep (or Ultra-Deep) Power-Down
 	 * mode, issue the command to bring it back to normal operation.
@@ -688,59 +729,59 @@ static const struct flash_driver_api spi_flash_at45_api = {
 #define XSTR(x) STR(x)
 #define STR(x) #x
 
-#define SPI_FLASH_EN25_INST(idx)					     \
-	enum {								     \
-		INST_##idx##_BYTES = (DT_INST_PROP(idx, size) / 8),	     \
-		INST_##idx##_PAGES = (INST_##idx##_BYTES /		     \
-				      DT_INST_PROP(idx, page_size)),	     \
-	};								     \
-	static struct spi_flash_at45_data inst_##idx##_data = {		     \
-		.lock = Z_SEM_INITIALIZER(inst_##idx##_data.lock, 1, 1),     \
-		IF_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT, (		     \
-			.pm_state = DEVICE_PM_ACTIVE_STATE))		     \
-	};								     \
-	static const struct spi_flash_at45_config inst_##idx##_config = {    \
-		.spi_bus = DT_INST_BUS_LABEL(idx),			     \
-		.spi_cfg = {						     \
-			.frequency = DT_INST_PROP(idx, spi_max_frequency),   \
-			.operation = SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB | \
-				     SPI_WORD_SET(8) | SPI_LINES_SINGLE,     \
-			.slave = DT_INST_REG_ADDR(idx),			     \
-			.cs = &inst_##idx##_data.spi_cs,		     \
-		},							     \
-		IF_ENABLED(DT_INST_SPI_DEV_HAS_CS_GPIOS(idx), (		     \
-			.cs_gpio = DT_INST_SPI_DEV_CS_GPIOS_LABEL(idx),      \
-			.cs_pin  = DT_INST_SPI_DEV_CS_GPIOS_PIN(idx),	     \
-			.cs_dt_flags = DT_INST_SPI_DEV_CS_GPIOS_FLAGS(idx),)) \
-		IF_ENABLED(CONFIG_FLASH_PAGE_LAYOUT, (			     \
-			.pages_layout = {				     \
-				.pages_count = INST_##idx##_PAGES,	     \
-				.pages_size  = DT_INST_PROP(idx, page_size), \
-			},))						     \
-		.chip_size   = INST_##idx##_BYTES,			     \
-		.sector_size = DT_INST_PROP(idx, sector_size),		     \
-		.block_size  = DT_INST_PROP(idx, block_size),		     \
-		.page_size   = DT_INST_PROP(idx, page_size),		     \
-		.t_enter_dpd = ceiling_fraction(			     \
-					DT_INST_PROP(idx, enter_dpd_delay),  \
-					NSEC_PER_USEC),			     \
-		.t_exit_dpd  = ceiling_fraction(			     \
-					DT_INST_PROP(idx, exit_dpd_delay),   \
-					NSEC_PER_USEC),			     \
-		.use_udpd    = DT_INST_PROP(idx, use_udpd),		     \
-		.jedec_id    = DT_INST_PROP(idx, jedec_id),		     \
-	};								     \
-	IF_ENABLED(CONFIG_FLASH_PAGE_LAYOUT, (				     \
-		BUILD_ASSERT(						     \
-			(INST_##idx##_PAGES * DT_INST_PROP(idx, page_size))  \
-			== INST_##idx##_BYTES,				     \
-			"Page size specified for instance " #idx " of "	     \
-			"atmel,at45 is not compatible with its "	     \
-			"total size");))				     \
-	DEVICE_DEFINE(inst_##idx, DT_INST_LABEL(idx),			     \
-		      spi_flash_at45_init, spi_flash_at45_pm_control,	     \
-		      &inst_##idx##_data, &inst_##idx##_config,		     \
-		      POST_KERNEL, CONFIG_SPI_FLASH_EN25_INIT_PRIORITY,      \
+#define SPI_FLASH_EN25_INST(idx)					                    \
+	enum {								                                \
+		INST_##idx##_BYTES = (DT_INST_PROP(idx, size) / 8),	            \
+		INST_##idx##_PAGES = (INST_##idx##_BYTES /		                \
+				      DT_INST_PROP(idx, page_size)),	                \
+	};								                                    \
+	static struct spi_flash_at45_data inst_##idx##_data = {		        \
+		.lock = Z_SEM_INITIALIZER(inst_##idx##_data.lock, 1, 1),        \
+		IF_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT, (		            \
+			.pm_state = DEVICE_PM_ACTIVE_STATE))		                \
+	};								                                    \
+	static const struct spi_flash_at45_config inst_##idx##_config = {   \
+		.spi_bus = DT_INST_BUS_LABEL(idx),			                    \
+		.spi_cfg = {						                            \
+			.frequency = DT_INST_PROP(idx, spi_max_frequency),          \
+			.operation = SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB |        \
+				     SPI_WORD_SET(8) | SPI_LINES_SINGLE,                \
+			.slave = DT_INST_REG_ADDR(idx),			                    \
+			.cs = &inst_##idx##_data.spi_cs,		                    \
+		},							                                    \
+		IF_ENABLED(DT_INST_SPI_DEV_HAS_CS_GPIOS(idx), (		            \
+			.cs_gpio = DT_INST_SPI_DEV_CS_GPIOS_LABEL(idx),             \
+			.cs_pin  = DT_INST_SPI_DEV_CS_GPIOS_PIN(idx),	            \
+			.cs_dt_flags = DT_INST_SPI_DEV_CS_GPIOS_FLAGS(idx),))       \
+		IF_ENABLED(CONFIG_FLASH_PAGE_LAYOUT, (			                \
+			.pages_layout = {				                            \
+				.pages_count = INST_##idx##_PAGES,	                    \
+				.pages_size  = DT_INST_PROP(idx, page_size),            \
+			},))						                                \
+		.chip_size   = INST_##idx##_BYTES,			                    \
+		.sector_size = DT_INST_PROP(idx, sector_size),		            \
+		.block_size  = DT_INST_PROP(idx, block_size),		            \
+		.page_size   = DT_INST_PROP(idx, page_size),		            \
+		.t_enter_dpd = ceiling_fraction(			                    \
+					DT_INST_PROP(idx, enter_dpd_delay),                 \
+					NSEC_PER_USEC),			                            \
+		.t_exit_dpd  = ceiling_fraction(			                    \
+					DT_INST_PROP(idx, exit_dpd_delay),                  \
+					NSEC_PER_USEC),			                            \
+		.use_udpd    = DT_INST_PROP(idx, use_udpd),		                \
+		.jedec_id    = DT_INST_PROP(idx, jedec_id),		                \
+	};								                                    \
+	IF_ENABLED(CONFIG_FLASH_PAGE_LAYOUT, (				                \
+		BUILD_ASSERT(						                            \
+			(INST_##idx##_PAGES * DT_INST_PROP(idx, page_size))         \
+			== INST_##idx##_BYTES,				                        \
+			"Page size specified for instance " #idx " of "	            \
+			"atmel,at45 is not compatible with its "	                \
+			"total size");))				                            \
+	DEVICE_DEFINE(inst_##idx, DT_INST_LABEL(idx),			            \
+		      spi_flash_at45_init, spi_flash_at45_pm_control,	        \
+		      &inst_##idx##_data, &inst_##idx##_config,		            \
+		      POST_KERNEL, CONFIG_SPI_FLASH_EN25_INIT_PRIORITY,         \
 		      &spi_flash_at45_api);
 
 DT_INST_FOREACH_STATUS_OKAY(SPI_FLASH_EN25_INST)

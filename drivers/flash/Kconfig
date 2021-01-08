@@ -18,14 +18,6 @@ menuconfig SPI_FLASH_EN25
 
 if SPI_FLASH_EN25
 
-config SPI_FLASH_EN25_USE_READ_MODIFY_WRITE
-	bool "Use Read-Modify-Write command in flash_write()"
-	default y
-	help
-	  Use the Read-Modify-Write command (opcode 0x58) instead of the default
-	  Main Memory Program without Built-In Erase (opcode 0x02). This allows
-	  writing of data without prior erasing of corresponding pages.
-
 config SPI_FLASH_EN25_INIT_PRIORITY
 	int "Driver initialization priority"
 	default 80

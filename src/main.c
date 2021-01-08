@@ -12,12 +12,6 @@
 
 //LOG_MODULE_REGISTER(main);
 
-
-
-#if !DT_NODE_EXISTS(DT_NODELABEL(flash42))
-#error "whoops"
-#endif
-
 #define FLASH_DEVICE DT_LABEL(DT_NODELABEL(flash42))
 
 
@@ -27,7 +21,7 @@
  * Note - erasing of the test region or whole chip is performed only when
  *        CONFIG_SPI_FLASH_AT45_USE_READ_MODIFY_WRITE is not enabled.
  */
-#define ERASE_WHOLE_CHIP    1
+#define ERASE_WHOLE_CHIP    0
 
 #define TEST_REGION_OFFSET  0xFE00
 #define TEST_REGION_SIZE    0x400
