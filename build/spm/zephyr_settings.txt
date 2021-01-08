@@ -1,2 +1,0 @@
-"BOARD_ROOT":"/home/skobec/Programs/ncs/nrf"
-"DTS_ROOT":"/home/skobec/Programs/ncs/nrf"

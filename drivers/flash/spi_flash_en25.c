@@ -66,7 +66,7 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 		.count   = ARRAY_SIZE(_buf_array),  \
 	}
 
-struct spi_flash_at45_data {
+struct spi_flash_en25_data {
 	const struct device *spi;
 	struct spi_cs_control spi_cs;
 	struct k_sem lock;
@@ -75,7 +75,7 @@ struct spi_flash_at45_data {
 #endif
 };
 
-struct spi_flash_at45_config {
+struct spi_flash_en25_config {
 	const char *spi_bus;
 	struct spi_config spi_cfg;
 	const char *cs_gpio;
@@ -94,18 +94,18 @@ struct spi_flash_at45_config {
 	uint8_t jedec_id[3];
 };
 
-static const struct flash_parameters flash_at45_parameters = {
+static const struct flash_parameters flash_en25_parameters = {
 	.write_block_size = 1,
 	.erase_value = 0xff,
 };
 
-static struct spi_flash_at45_data *get_dev_data(const struct device *dev)
+static struct spi_flash_en25_data *get_dev_data(const struct device *dev)
 {
 	return dev->data;
 }
 
 static const struct 
-spi_flash_at45_config *get_dev_config(const struct device *dev)
+spi_flash_en25_config *get_dev_config(const struct device *dev)
 {
 	return dev->config;
 }
@@ -122,7 +122,7 @@ static void release(const struct device *dev)
 
 static int check_jedec_id(const struct device *dev)
 {
-	const struct spi_flash_at45_config *cfg = get_dev_config(dev);
+	const struct spi_flash_en25_config *cfg = get_dev_config(dev);
 	int err;
 	uint8_t const *expected_id = cfg->jedec_id;
 	uint8_t read_id[sizeof(cfg->jedec_id)];
@@ -309,10 +309,10 @@ static bool is_valid_request(off_t addr, size_t size, size_t chip_size)
 	return (addr >= 0 && (addr + size) <= chip_size);
 }
 
-static int spi_flash_at45_read(const struct device *dev, off_t offset,
+static int spi_flash_en25_read(const struct device *dev, off_t offset,
 			       void *data, size_t len)
 {
-	const struct spi_flash_at45_config *cfg = get_dev_config(dev);
+	const struct spi_flash_en25_config *cfg = get_dev_config(dev);
 	int err;
 
 	if (!is_valid_request(offset, len, cfg->chip_size)) {
@@ -397,10 +397,10 @@ static int perform_write(const struct device *dev, off_t offset,
 	return (err != 0) ? -EIO : 0;
 }
 
-static int spi_flash_at45_write(const struct device *dev, off_t offset,
+static int spi_flash_en25_write(const struct device *dev, off_t offset,
 				const void *data, size_t len)
 {
-	const struct spi_flash_at45_config *cfg = get_dev_config(dev);
+	const struct spi_flash_en25_config *cfg = get_dev_config(dev);
 	int err = 0;
 
 	if (!is_valid_request(offset, len, cfg->chip_size)) {
@@ -508,10 +508,10 @@ static int perform_erase_op(const struct device *dev, uint8_t opcode,
 	return (err != 0) ? -EIO : 0;
 }
 
-static int spi_flash_at45_erase(const struct device *dev, off_t offset,
+static int spi_flash_en25_erase(const struct device *dev, off_t offset,
 				size_t size)
 {
-	const struct spi_flash_at45_config *cfg = get_dev_config(dev);
+	const struct spi_flash_en25_config *cfg = get_dev_config(dev);
 	int err = 0;
 
 	if (!is_valid_request(offset, size, cfg->chip_size)) {
@@ -566,13 +566,13 @@ static int spi_flash_at45_erase(const struct device *dev, off_t offset,
 	return err;
 }
 
-static int spi_flash_at45_write_protection(const struct device *dev,
+static int spi_flash_en25_write_protection(const struct device *dev,
 					   bool enable)
 {
 	ARG_UNUSED(dev);
 	ARG_UNUSED(enable);
 
-	/* The Sector Protection mechanism that is available in AT45 family
+	/* The Sector Protection mechanism that is available in en25 family
 	 * chips is more complex than what is exposed by the the flash API
 	 * (particular sectors need to be earlier configured in a write to
 	 * the nonvolatile Sector Protection Register), so it is not feasible
@@ -585,7 +585,7 @@ static int spi_flash_at45_write_protection(const struct device *dev,
 }
 
 #if IS_ENABLED(CONFIG_FLASH_PAGE_LAYOUT)
-static void spi_flash_at45_pages_layout(const struct device *dev,
+static void spi_flash_en25_pages_layout(const struct device *dev,
 					const struct flash_pages_layout **layout,
 					size_t *layout_size)
 {
@@ -595,10 +595,10 @@ static void spi_flash_at45_pages_layout(const struct device *dev,
 #endif /* IS_ENABLED(CONFIG_FLASH_PAGE_LAYOUT) */
 
 
-static int spi_flash_at45_init(const struct device *dev)
+static int spi_flash_en25_init(const struct device *dev)
 {
-	struct spi_flash_at45_data *dev_data = get_dev_data(dev);
-	const struct spi_flash_at45_config *dev_config = get_dev_config(dev);
+	struct spi_flash_en25_data *dev_data = get_dev_data(dev);
+	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
 	int err;
 
 	dev_data->spi = device_get_binding(dev_config->spi_bus);
@@ -655,12 +655,12 @@ static int spi_flash_at45_init(const struct device *dev)
 }
 
 #if IS_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT)
-static int spi_flash_at45_pm_control(const struct device *dev,
+static int spi_flash_en25_pm_control(const struct device *dev,
 				     uint32_t ctrl_command,
 				     void *context, device_pm_cb cb, void *arg)
 {
-	struct spi_flash_at45_data *dev_data = get_dev_data(dev);
-	const struct spi_flash_at45_config *dev_config = get_dev_config(dev);
+	struct spi_flash_en25_data *dev_data = get_dev_data(dev);
+	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
 	int err = 0;
 
 	if (ctrl_command == DEVICE_PM_SET_POWER_STATE) {
@@ -706,21 +706,21 @@ static int spi_flash_at45_pm_control(const struct device *dev,
 #endif /* IS_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT) */
 
 static const struct flash_parameters *
-flash_at45_get_parameters(const struct device *dev)
+flash_en25_get_parameters(const struct device *dev)
 {
 	ARG_UNUSED(dev);
 
-	return &flash_at45_parameters;
+	return &flash_en25_parameters;
 }
 
-static const struct flash_driver_api spi_flash_at45_api = {
-	.read = spi_flash_at45_read,
-	.write = spi_flash_at45_write,
-	.erase = spi_flash_at45_erase,
-	.write_protection = spi_flash_at45_write_protection,
-	.get_parameters = flash_at45_get_parameters,
+static const struct flash_driver_api spi_flash_en25_api = {
+	.read = spi_flash_en25_read,
+	.write = spi_flash_en25_write,
+	.erase = spi_flash_en25_erase,
+	.write_protection = spi_flash_en25_write_protection,
+	.get_parameters = flash_en25_get_parameters,
 #if IS_ENABLED(CONFIG_FLASH_PAGE_LAYOUT)
-	.page_layout = spi_flash_at45_pages_layout,
+	.page_layout = spi_flash_en25_pages_layout,
 #endif
 };
 
@@ -735,12 +735,12 @@ static const struct flash_driver_api spi_flash_at45_api = {
 		INST_##idx##_PAGES = (INST_##idx##_BYTES /		                \
 				      DT_INST_PROP(idx, page_size)),	                \
 	};								                                    \
-	static struct spi_flash_at45_data inst_##idx##_data = {		        \
+	static struct spi_flash_en25_data inst_##idx##_data = {		        \
 		.lock = Z_SEM_INITIALIZER(inst_##idx##_data.lock, 1, 1),        \
 		IF_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT, (		            \
 			.pm_state = DEVICE_PM_ACTIVE_STATE))		                \
 	};								                                    \
-	static const struct spi_flash_at45_config inst_##idx##_config = {   \
+	static const struct spi_flash_en25_config inst_##idx##_config = {   \
 		.spi_bus = DT_INST_BUS_LABEL(idx),			                    \
 		.spi_cfg = {						                            \
 			.frequency = DT_INST_PROP(idx, spi_max_frequency),          \
@@ -779,9 +779,9 @@ static const struct flash_driver_api spi_flash_at45_api = {
 			"atmel,at45 is not compatible with its "	                \
 			"total size");))				                            \
 	DEVICE_DEFINE(inst_##idx, DT_INST_LABEL(idx),			            \
-		      spi_flash_at45_init, spi_flash_at45_pm_control,	        \
+		      spi_flash_en25_init, spi_flash_en25_pm_control,	        \
 		      &inst_##idx##_data, &inst_##idx##_config,		            \
 		      POST_KERNEL, CONFIG_SPI_FLASH_EN25_INIT_PRIORITY,         \
-		      &spi_flash_at45_api);
+		      &spi_flash_en25_api);
 
 DT_INST_FOREACH_STATUS_OKAY(SPI_FLASH_EN25_INST)

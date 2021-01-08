@@ -41,12 +41,12 @@ void main(void)
 	}
 
     /* Keep lr reset, flash hold and flash wp high*/
-	gpio_pin_configure(dev, 16, GPIO_OUTPUT);
-	gpio_pin_set(dev, 16, 1);
-	gpio_pin_configure(dev, 0, GPIO_OUTPUT);
-	gpio_pin_set(dev, 0, 1);
-	gpio_pin_configure(dev, 31, GPIO_OUTPUT);
-	gpio_pin_set(dev, 31, 1);
+	//gpio_pin_configure(dev, 16, GPIO_OUTPUT);
+	//gpio_pin_set(dev, 16, 1);
+	//gpio_pin_configure(dev, 0, GPIO_OUTPUT);
+	//gpio_pin_set(dev, 0, 1);
+	//gpio_pin_configure(dev, 31, GPIO_OUTPUT);
+	//gpio_pin_set(dev, 31, 1);
 
 	const struct device *flash_dev;
 	int i;
