@@ -12,6 +12,7 @@ set(CMAKE_BUILD_TYPE Debug)
 zephyr_include_directories(.)
 zephyr_include_directories(src)
 
+add_subdirectory(drivers)
 
 FILE(GLOB app_sources src/*.c)
 

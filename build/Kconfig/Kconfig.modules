@@ -1,0 +1,6 @@
+osource "/home/skobec/Programs/ncs/nrf/Kconfig.nrf"
+
+osource "/home/skobec/Programs/ncs/bootloader/mcuboot/zephyr/Kconfig"
+
+osource "/home/skobec/Programs/ncs/nrfxlib/Kconfig.nrfxlib"
+

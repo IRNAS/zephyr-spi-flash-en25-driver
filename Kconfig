@@ -1,0 +1,7 @@
+source "$ZEPHYR_BASE/Kconfig.zephyr"
+
+menu "zephyr-spi-flash-en25"
+
+rsource "drivers/Kconfig"
+
+endmenu
