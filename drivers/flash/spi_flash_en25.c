@@ -14,10 +14,6 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 
 /* EN25 commands used by this driver: */
 /* - Main Memory Byte/Page Program through Buffer 1 without Built-In Erase */
-/* - Deep Power-Down */
-#define CMD_ENTER_DPD		0xB9
-/* - Resume from Deep Power-Down */
-#define CMD_EXIT_DPD		0xAB
 /* - Ultra-Deep Power-Down */
 #define CMD_ENTER_UDPD		0x79
 /* - Buffer and Page Size Configuration, "Power of 2" binary page size */
@@ -36,6 +32,8 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 #define CMD_READ_ID		        0x9F
 /* - Status Register Read Command */
 #define CMD_READ_STATUS		    0x05
+/* - Status Register Write Command */
+#define CMD_WRITE_STATUS		0x01
 /* - Chip Erase Command */
 #define CMD_READ		        0x03    
 /* - Page Program (Continuous Write) Command */
@@ -50,8 +48,10 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 #define CMD_HALF_BLOCK_ERASE	0x52
 /* - Page Erase */
 #define CMD_PAGE_ERASE		    0x81
-
-
+/* - Enter Deep Power-Down Command */
+#define CMD_ENTER_DPD		    0xB9
+/* - Exit from Deep Power-Down Command */
+#define CMD_EXIT_DPD		    0xAB
 
 
 
@@ -215,46 +215,9 @@ static int wait_until_ready(const struct device *dev)
 	return err;
 }
 
-static int configure_page_size(const struct device *dev)
-{
-	int err;
-	uint8_t status;
-	uint8_t const conf_binary_page_size[] = CMD_BINARY_PAGE_SIZE;
-	const struct spi_buf tx_buf[] = {
-		{
-			.buf = (void *)conf_binary_page_size,
-			.len = sizeof(conf_binary_page_size),
-		}
-	};
-	DEF_BUF_SET(tx_buf_set, tx_buf);
-
-	err = read_status_register(dev, &status);
-	if (err != 0) {
-		return err;
-	}
-
-	/* If the device is already configured for "power of 2" binary
-	 * page size, there is nothing more to do.
-	 */
-	if (status & STATUS_REG_LSB_PAGE_SIZE_BIT) {
-		return 0;
-	}
-
-	err = spi_write(get_dev_data(dev)->spi,
-			&get_dev_config(dev)->spi_cfg,
-			&tx_buf_set);
-	if (err != 0) {
-		LOG_ERR("SPI transaction failed with code: %d/%u",
-			err, __LINE__);
-	} else {
-		err = wait_until_ready(dev);
-	}
-
-	return (err != 0) ? -EIO : 0;
-}
-
-static int send_cmd_op(const struct device *dev, uint8_t opcode,
-			 uint32_t delay)
+static int send_cmd_op(const struct device *dev, 
+                       uint8_t opcode,
+			           uint32_t delay)
 {
 	int err = 0;
 	const struct spi_buf tx_buf[] = {
@@ -434,6 +397,41 @@ static int spi_flash_en25_write(const struct device *dev, off_t offset,
 	return err;
 }
 
+/* For this will stayed commented out as we dont need it */
+//static int disable_block_protect(const struct device *dev)
+//{
+//    int err;
+//    err = set_write_enable(dev);
+//	if (err != 0) {
+//        return err;
+//    }
+//
+//	uint8_t const op_and_addr[] = {
+//        CMD_PAGE_PROGRAM,
+//		0b00111100,
+//	};
+//
+//	const struct spi_buf tx_buf[] = {
+//		{
+//			.buf = (void *)&op_and_addr,
+//			.len = sizeof(op_and_addr),
+//		}
+//	};
+//
+//	DEF_BUF_SET(tx_buf_set, tx_buf);
+//
+//	err = spi_write(get_dev_data(dev)->spi,
+//			&get_dev_config(dev)->spi_cfg,
+//			&tx_buf_set);
+//	if (err != 0) {
+//		LOG_ERR("SPI transaction failed with code: %d/%u",
+//			err, __LINE__);
+//	} else {
+//		err = wait_until_ready(dev);
+//	}
+//
+//	return (err != 0) ? -EIO : 0;
+//}
 
 static int perform_chip_erase(const struct device *dev)
 {
@@ -637,18 +635,14 @@ static int spi_flash_en25_init(const struct device *dev)
 	 */
 	send_cmd_op(dev, CMD_EXIT_DPD, dev_config->t_exit_dpd);
 
+    /* Check jedec ID, this should not fail */
 	err = check_jedec_id(dev);
+    if (err != 0) {
+        return err;
+    }
 
-    // TODO: en25 flash chip does not have option to 
-    // set page size to the power of 2, so we skip this step.
-    // Since the page size is already 256 bytes this might not be problem
-    // Fri 08 Jan 2021 12:58:29 CET
-    //
-	//if (err == 0) {
-	//    printk("STARTING MY INIT3\n");
-	//	err = configure_page_size(dev);
-	//    printk("STARTING MY INIT4\n");
-	//}
+    /* Place holder for function call, we might need it in future. */
+    //err = disable_block_protect(dev);
 
 	release(dev);
 	return err;
@@ -670,19 +664,23 @@ static int spi_flash_en25_pm_control(const struct device *dev,
 			switch (new_state) {
 			case DEVICE_PM_ACTIVE_STATE:
 				acquire(dev);
-				send_cmd_op(dev, CMD_EXIT_DPD,
-					      dev_config->t_exit_dpd);
+				send_cmd_op(dev, CMD_EXIT_DPD, dev_config->t_exit_dpd);
 				release(dev);
 				break;
 
 			case DEVICE_PM_LOW_POWER_STATE:
+				acquire(dev);
+				send_cmd_op(dev,
+				            CMD_ENTER_DPD,
+					        dev_config->t_enter_dpd);
+				release(dev);
+				break;
 			case DEVICE_PM_SUSPEND_STATE:
 			case DEVICE_PM_OFF_STATE:
 				acquire(dev);
 				send_cmd_op(dev,
-					dev_config->use_udpd ? CMD_ENTER_UDPD
-							     : CMD_ENTER_DPD,
-					dev_config->t_enter_dpd);
+				            CMD_ENTER_DPD,
+					        dev_config->t_enter_dpd);
 				release(dev);
 				break;
 

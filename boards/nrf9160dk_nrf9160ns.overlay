@@ -28,8 +28,8 @@
         page-size = <256>;
         spi-max-frequency = <104000000>;
 
-        enter-dpd-delay = <2000>;
-        exit-dpd-delay = <35000>;
+        enter-dpd-delay = <30>;
+        exit-dpd-delay = <30>;
     };
 
     //flash42: at45db321e@0 {
