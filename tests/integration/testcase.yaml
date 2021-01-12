@@ -1,6 +1,0 @@
-tests:
-  # section.subsection
-  testing.ztest:
-    platform_allow: nrf52840dk_nrf52840
-    tags: testing
-    default: true
