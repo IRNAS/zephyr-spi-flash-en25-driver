@@ -5,6 +5,7 @@
 #include <zephyr.h>
 #include <ztest.h>
 #include <drivers/flash.h>
+#include <drivers/gpio.h>
 #include <devicetree.h>
 #include <storage/flash_map.h>
 
@@ -27,6 +28,15 @@ static void test_get_binding()
 	const struct device *flash_dev;
 	flash_dev = device_get_binding(FLASH_DEVICE);
     zassert_not_null(flash_dev, "Returned device is null");
+
+	const struct device *gpio_dev;
+	gpio_dev = device_get_binding("GPIO_0");
+    gpio_pin_configure(gpio_dev, 16, GPIO_OUTPUT);  // LR1110 reset
+    gpio_pin_configure(gpio_dev, 18, GPIO_OUTPUT);  // LR1110 nss
+    gpio_pin_configure(gpio_dev, 19, GPIO_OUTPUT);  // LR1110 pwr en
+	gpio_pin_set(gpio_dev, 16, 1);
+	gpio_pin_set(gpio_dev, 18, 1);
+	gpio_pin_set(gpio_dev, 19, 1);
 }
 
 #define ERASE_BUF_SIZE PAGE_SIZE      /* This should be equal to page size*/
@@ -58,8 +68,13 @@ static void test_full_erase_full_read_write()
 
 	printk(" INFO - Starting full flash erase, this will take around 15 seconds...\n");
 	err = flash_erase(flash_dev, 0, chip_size);
+	printk(" INFO - Starting full flash erase, this will take around 15 seconds...\n");
     zassert_equal(err, 0, "Full flash erase failed");
 
+    err = flash_read(flash_dev, 0, erase_check_buf, ERASE_BUF_SIZE);
+    zassert_equal(err, 0, "Flash read failed at i: %d", i);
+    printk("Reached end\n");
+    //while(1);
 
 	printk(" INFO - Checking that everything was erased, this will take some time...\n");
     for (i = 0; i < page_count; i++) {
@@ -154,7 +169,7 @@ static void test_erase_read_write()
 	for (i = 0; i < TEST_REGION_SIZE; ++i) {
         zassert_equal(read_buf[i], write_buf[i], 
                 "ERROR at read_buf[%d]: expected 0x%02X, got 0x%02X\n", 
-                i, 0xFF, read_buf[i]);
+                i, write_buf[i], read_buf[i]);
 	}
 }
 
@@ -273,7 +288,6 @@ static void test_low_power()
 				     NULL, NULL);
     zassert_equal(err, 0, "Setting low power mode failed");
 #endif
-    k_sleep(K_FOREVER);
 }
 
 

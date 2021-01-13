@@ -172,10 +172,15 @@ static int read_status_register(const struct device *dev, uint8_t *status)
 {
 	int err;
 	const uint8_t opcode = CMD_READ_STATUS;
+	const uint8_t empty = 0;
 	const struct spi_buf tx_buf[] = {
 		{
 			.buf = (void *)&opcode,
 			.len = sizeof(opcode),
+		},
+		{
+			.buf = (void *)&empty,
+			.len = sizeof(uint8_t),
 		}
 	};
 	const struct spi_buf rx_buf[] = {
