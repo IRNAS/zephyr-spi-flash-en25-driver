@@ -9,8 +9,6 @@
 #include <devicetree.h>
 #include <storage/flash_map.h>
 
-//#define ERASE_WHOLE_CHIP    0
-
 #define FLASH_DEVICE DT_LABEL(DT_NODELABEL(flash42))
 #define CHIP_SIZE DT_PROP(DT_NODELABEL(flash42), size)
 #define PAGE_SIZE DT_PROP(DT_NODELABEL(flash42), page_size)
@@ -28,15 +26,18 @@ static void test_get_binding()
 	const struct device *flash_dev;
 	flash_dev = device_get_binding(FLASH_DEVICE);
     zassert_not_null(flash_dev, "Returned device is null");
-
-	const struct device *gpio_dev;
-	gpio_dev = device_get_binding("GPIO_0");
-    gpio_pin_configure(gpio_dev, 16, GPIO_OUTPUT);  // LR1110 reset
-    gpio_pin_configure(gpio_dev, 18, GPIO_OUTPUT);  // LR1110 nss
-    gpio_pin_configure(gpio_dev, 19, GPIO_OUTPUT);  // LR1110 pwr en
-	gpio_pin_set(gpio_dev, 16, 1);
-	gpio_pin_set(gpio_dev, 18, 1);
-	gpio_pin_set(gpio_dev, 19, 1);
+    
+    if (strcmp(CONFIG_BOARD, "nrf9160dk_nrf9160") == 0)
+    {
+      const struct device *gpio_dev;
+      gpio_dev = device_get_binding("GPIO_0");
+      gpio_pin_configure(gpio_dev, 16, GPIO_OUTPUT);  // LR1110 reset
+      gpio_pin_configure(gpio_dev, 18, GPIO_OUTPUT);  // LR1110 nss
+      gpio_pin_configure(gpio_dev, 19, GPIO_OUTPUT);  // LR1110 pwr en
+      gpio_pin_set(gpio_dev, 16, 1);
+      gpio_pin_set(gpio_dev, 18, 1);
+      gpio_pin_set(gpio_dev, 19, 1);
+    }
 }
 
 #define ERASE_BUF_SIZE PAGE_SIZE      /* This should be equal to page size*/
@@ -70,11 +71,6 @@ static void test_full_erase_full_read_write()
 	err = flash_erase(flash_dev, 0, chip_size);
 	printk(" INFO - Starting full flash erase, this will take around 15 seconds...\n");
     zassert_equal(err, 0, "Full flash erase failed");
-
-    err = flash_read(flash_dev, 0, erase_check_buf, ERASE_BUF_SIZE);
-    zassert_equal(err, 0, "Flash read failed at i: %d", i);
-    printk("Reached end\n");
-    //while(1);
 
 	printk(" INFO - Checking that everything was erased, this will take some time...\n");
     for (i = 0; i < page_count; i++) {
@@ -283,7 +279,7 @@ static void test_low_power()
 	flash_dev = device_get_binding(FLASH_DEVICE);
 
 #if IS_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT)
-	printk("Putting the flash device into low power state... ");
+	printk("Putting the flash device into low power state...\n");
 	err = device_set_power_state(flash_dev, DEVICE_PM_LOW_POWER_STATE,
 				     NULL, NULL);
     zassert_equal(err, 0, "Setting low power mode failed");

@@ -1,8 +1,6 @@
 # Zepyhr SPi flash driver for EN25QH32B-104HIP2C flash chip
 
 This repo is an example of flash driver that uses public Zephyr flash API.
-This example has been tested only on Telespor V3.2 board that has NRF9160 microcontroller.
-In order to make this work on a different platform overlay file needs to be added/changed.
 
 
 ## Compiling and running the main.c file
@@ -12,6 +10,27 @@ To compile and run the code run below command from the root directory of the pro
 ```shell
 west build -b nrf9160dk_nrf9160ns && west flash
 ```
+or
+```shell
+west build -b nrf52840dk_nrf52811 && west flash
+```
+If using nrf52811 microcontroller make sure that you commented out below two lines in file found in ncs folder: 
+`ncs/zephyr/boards/arm/nrf52840dk_nrf52811`.
+If you don't do that the reset pin of nrf52811 will not work properly.
+
+```
+# Copyright (c) 2019 Nordic Semiconductor ASA
+
+# SPDX-License-Identifier: Apache-2.0
+
+# The nrf52840dk_nrf52811 board mirrors the nRF52840 DK hardware. This
+# needs to be considered by certain system initialization functionality
+# residing in system_nrf52811.c and SoC dependent routines in nrfx_coredep.h.
+# zephyr_compile_definitions(DEVELOP_IN_NRF52840)
+# zephyr_compile_definitions(NRFX_COREDEP_DELAY_US_LOOP_CYCLES=3)
+```
+
+
 
 If you connect to the serial monitor you can observe the outputs from the Ztest framework.
 
