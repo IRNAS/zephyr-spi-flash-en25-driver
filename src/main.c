@@ -69,7 +69,6 @@ static void test_full_erase_full_read_write()
 
 	printk(" INFO - Starting full flash erase, this will take around 15 seconds...\n");
 	err = flash_erase(flash_dev, 0, chip_size);
-	printk(" INFO - Starting full flash erase, this will take around 15 seconds...\n");
     zassert_equal(err, 0, "Full flash erase failed");
 
 	printk(" INFO - Checking that everything was erased, this will take some time...\n");
