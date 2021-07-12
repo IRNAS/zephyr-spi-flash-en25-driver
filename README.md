@@ -1,55 +1,37 @@
-# TODO:
-
-
 # Zepyhr SPi flash driver for EN25QH32B-104HIP2C flash chip
 
-This repo is an example of flash driver that uses public Zephyr flash API.
+This repository contains driver and tests for interfacing with EN25QH32B-104HIP2C via the zephyr flash API.
 
+## Setup
 
-## Compiling and running the main.c file
+Before you get started, you'll need to install the nRF Connect SDK. Here are the full instructions:
 
-To compile and run the code run below command from the root directory of the project:
+* [Windows, Linux](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/getting_started.html)
 
-```shell
-west build -b nrf9160dk_nrf9160ns && west flash
-```
-or
-```shell
-west build -b nrf52840dk_nrf52811 && west flash
-```
-If using nrf52811 microcontroller make sure that you commented out below two lines in file found in ncs folder:
-`ncs/zephyr/boards/arm/nrf52840dk_nrf52811`.
-If you don't do that the reset pin of nrf52811 will not work properly.
+If you already have a NCS setup you can follow these steps:
 
-```
-# Copyright (c) 2019 Nordic Semiconductor ASA
+1. To get the LR1110 modem library we need to update `<path to ncs>/ncs/nrf/west.yml`. First in the `remotes` section add:
 
-# SPDX-License-Identifier: Apache-2.0
+   ```yaml
+    - name: irnas
+      url-base: https://github.com/irnas
+   ```
 
-# The nrf52840dk_nrf52811 board mirrors the nRF52840 DK hardware. This
-# needs to be considered by certain system initialization functionality
-# residing in system_nrf52811.c and SoC dependent routines in nrfx_coredep.h.
-# zephyr_compile_definitions(DEVELOP_IN_NRF52840)
-# zephyr_compile_definitions(NRFX_COREDEP_DELAY_US_LOOP_CYCLES=3)
-```
+2. Then in the `projects` section add at the bottom:
 
+    ```yaml
+    - name: zephyr-spi-flash-en25-driver
+      repo-path: zephyr-spi-flash-en25-driver
+      path: irnas/zephyr-spi-flash-en25-driver
+      remote: irnas
+      revision: v0.99.0
+    ```
 
+3. Then run `west update` in your freshly created bash/command prompt session.
+4. Above command will clone `zephyr-spi-flash-en25-driver` repository inside of `ncs/irnas/`. You can now run samples inside it and use its en25 driver code in your application projects.
 
-If you connect to the serial monitor you can observe the outputs from the Ztest framework.
+## Tests
 
-
-## Possible improvements and special notes
-
-* You can see that in order to compile flash driver the specific Kconfig settings need to be set.
-* Devicetree overlay currently uses wrong compatible label.
-I did not yet found a way to include a trivial label of my own.
-According to the Zephyr documentation on devicetree bindings it should be sufficient to create a `dts/bindings` folder with specific bindings yaml file.
-That yaml file defines actual required properties of the device.
-* Unlocking of blocking bits of the status register is not implemented.
-It seems that this not needed as everything works as expected.
-As long the **WP** and **HOLD** lines are kept high we should be able to communicate with the flash normally.
-* We are not yet completely satisfied with the structure of the project.
-Ideally we should follow general Zephyr structure with folders `drivers`, `tests` and `samples` (if needed).
-That means that the current main file should actually be in `testing/flash` folder, and it should be aware of the driver.
-I did not go down this route as I had problems with running the test automatically with `sanitycheck` script.
-I think that `testcase.yaml` file was not setup correctly, another yaml file might also be needed.
+1. Navigate to `./tests/flash_read_write`
+2. Build for one of the boards with supplied overlay, of make your own. Use `west build -b nrf52840dk_nrf52811` for example.
+3. flash with `west flash`
