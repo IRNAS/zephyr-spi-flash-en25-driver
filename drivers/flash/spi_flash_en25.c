@@ -727,7 +727,7 @@ static const struct flash_driver_api spi_flash_en25_api = {
 #endif
 };
 
-#define DT_DRV_COMPAT atmel_at45
+#define DT_DRV_COMPAT irnas_en25
 
 #define XSTR(x) STR(x)
 #define STR(x) #x
