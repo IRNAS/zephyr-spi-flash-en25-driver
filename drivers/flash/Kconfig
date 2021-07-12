@@ -5,6 +5,7 @@ menuconfig SPI_FLASH_EN25
 	bool "EN25 family flash driver"
 	select FLASH_HAS_DRIVER_ENABLED
 	depends on SPI
+	depends on FLASH
 	help
 	  This driver can handle several instances of EN25 family chips that
 	  are enabled by specifying devicetree nodes with the "compatible"

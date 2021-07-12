@@ -1,3 +1,6 @@
+# TODO:
+
+
 # Zepyhr SPi flash driver for EN25QH32B-104HIP2C flash chip
 
 This repo is an example of flash driver that uses public Zephyr flash API.
@@ -14,7 +17,7 @@ or
 ```shell
 west build -b nrf52840dk_nrf52811 && west flash
 ```
-If using nrf52811 microcontroller make sure that you commented out below two lines in file found in ncs folder: 
+If using nrf52811 microcontroller make sure that you commented out below two lines in file found in ncs folder:
 `ncs/zephyr/boards/arm/nrf52840dk_nrf52811`.
 If you don't do that the reset pin of nrf52811 will not work properly.
 
@@ -40,7 +43,7 @@ If you connect to the serial monitor you can observe the outputs from the Ztest 
 * You can see that in order to compile flash driver the specific Kconfig settings need to be set.
 * Devicetree overlay currently uses wrong compatible label.
 I did not yet found a way to include a trivial label of my own.
-According to the Zephyr documentation on devicetree bindings it should be sufficient to create a `dts/bindings` folder with specific bindings yaml file. 
+According to the Zephyr documentation on devicetree bindings it should be sufficient to create a `dts/bindings` folder with specific bindings yaml file.
 That yaml file defines actual required properties of the device.
 * Unlocking of blocking bits of the status register is not implemented.
 It seems that this not needed as everything works as expected.

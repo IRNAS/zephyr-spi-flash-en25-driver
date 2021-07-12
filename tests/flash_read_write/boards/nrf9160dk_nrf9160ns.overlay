@@ -12,14 +12,10 @@
     cs-gpios = <&gpio0 2 1>;
 
     flash42: en25qh32b@0 {
-        // We leave adesto and at45 as these values are defined in .yml files and
-        // actually provide a set of bindings that we have to provide.
-        // We do this so we can avoid writing this ourselfs. 
         reg = <0>;
         label = "EN25QH32B";
         status = "okay";
-        //compatible = "esmt,en25"; // No device binding
-        compatible = "atmel,at45";
+        compatible = "irnas,en25";
 
         jedec-id = [1c 70 16];  //Check this
         size = <33554432>;
@@ -31,20 +27,6 @@
         enter-dpd-delay = <30>;
         exit-dpd-delay = <30>;
     };
-
-    //flash42: at45db321e@0 {
-    //    compatible = "adesto,at45d";
-    //    reg = <0>;
-    //    spi-max-frequency = <4000000>;
-    //    label = "AT45DB321E";
-    //    jedec-id = [1f 27 01];
-    //    // jedec-id = [00 00 00];
-    //    size = <33554432>;
-    //    block-size = <4096>;
-    //    page-size = <512>;
-    //    enter-dpd-delay = <2000>;
-    //    exit-dpd-delay = <35000>;
-    //};
 };
 
 &uart0 {
