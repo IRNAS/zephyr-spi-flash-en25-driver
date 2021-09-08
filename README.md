@@ -2,9 +2,11 @@
 
 This repository contains driver and tests for interfacing with EN25QH32B-104HIP2C via the zephyr flash API.
 
-This drive is also compatible with IS25WP032D-JBLE flash.
-JEDEC id for EN25QH32B is `[1c 70 16]`
-JEDEC id for IS25WP032D is `[9D 70 16]`
+This drive is compatible with the following flash chips:
+
+- `EN25QH32B` with JEDEC id `[1c 70 16]`
+- `IS25WP032D` with JEDEC id `[9D 70 16]`
+- `W25Q32JVSSIQ` with JEDEC id `[EF 40 16]`
 
 ## Setup
 
@@ -28,7 +30,7 @@ If you already have a NCS setup you can follow these steps:
       repo-path: zephyr-spi-flash-en25-driver
       path: irnas/zephyr-spi-flash-en25-driver
       remote: irnas
-      revision: v1.0.0
+      revision: v1.1.0
     ```
 
 3. Then run `west update` in your freshly created bash/command prompt session.
