@@ -10,6 +10,8 @@
 #include <sys/byteorder.h>
 #include <logging/log.h>
 
+#include <spi_external_mutex.h>
+
 LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 
 /* EN25 commands used by this driver: */
@@ -118,6 +120,47 @@ static void acquire(const struct device *dev)
 static void release(const struct device *dev)
 {
 	k_sem_give(&get_dev_data(dev)->lock);
+}
+
+static int acquire_ext_mutex(const struct device *dev)
+{
+#ifdef CONFIG_NRFX_SPIM_EXT_MUTEX
+	int err = 0;
+	// make sure lock is acquired by trying multiple times
+	for(int i = 0; i < 5; i++)
+	{
+		err = spi_ext_mutex_acquire(get_dev_data(dev)->spi);
+		if(err < 0)
+		{
+			spi_ext_mutex_release(get_dev_data(dev)->spi);
+			k_sleep(K_MSEC(10));
+		}
+		else
+		{
+			break;
+		}
+	}
+	if (err < 0)
+	{
+		return err;
+	}
+	// LOG_INF("Spi ext mutex acquired");
+#endif
+	return 0;
+}
+
+static int release_ext_mutex(const struct device *dev)
+{
+#ifdef CONFIG_NRFX_SPIM_EXT_MUTEX
+	int err = spi_ext_mutex_release(get_dev_data(dev)->spi);
+	if (errno != 0)
+	{
+		LOG_ERR("spi_ext_mutex_release, err: %d", err);
+		return err;
+	}
+	// LOG_INF("Spi ext mutex released");
+#endif
+	return 0;
 }
 
 static int check_jedec_id(const struct device *dev)
@@ -311,11 +354,23 @@ static int spi_flash_en25_read(const struct device *dev, off_t offset,
 	DEF_BUF_SET(tx_buf_set, tx_buf);
 	DEF_BUF_SET(rx_buf_set, rx_buf);
 
+	err = acquire_ext_mutex(dev);
+	if(err)
+	{
+		return err;
+	}
+
 	acquire(dev);
 	err = spi_transceive(get_dev_data(dev)->spi,
 			     &cfg->spi_cfg,
 			     &tx_buf_set, &rx_buf_set);
 	release(dev);
+
+	err = release_ext_mutex(dev);
+	if(err)
+	{
+		return err;
+	}
 
 	if (err != 0) {
 		LOG_ERR("SPI transaction failed with code: %d/%u",
@@ -375,6 +430,12 @@ static int spi_flash_en25_write(const struct device *dev, off_t offset,
 		return -ENODEV;
 	}
 
+	err = acquire_ext_mutex(dev);
+	if(err)
+	{
+		return err;
+	}
+
 	acquire(dev);
 
 	while (len) {
@@ -398,6 +459,12 @@ static int spi_flash_en25_write(const struct device *dev, off_t offset,
 	}
 
 	release(dev);
+
+	err = release_ext_mutex(dev);
+	if(err)
+	{
+		return err;
+	}
 
 	return err;
 }
@@ -527,6 +594,12 @@ static int spi_flash_en25_erase(const struct device *dev, off_t offset,
 		return -EINVAL;
 	}
 
+	err = acquire_ext_mutex(dev);
+	if(err)
+	{
+		return err;
+	}
+
 	acquire(dev);
 
 	if (size == cfg->chip_size) {
@@ -565,6 +638,12 @@ static int spi_flash_en25_erase(const struct device *dev, off_t offset,
 	}
 
 	release(dev);
+
+	err = release_ext_mutex(dev);
+	if(err)
+	{
+		return err;
+	}
 
 	return err;
 }
@@ -623,12 +702,19 @@ static int spi_flash_en25_init(const struct device *dev)
 		dev_data->spi_cs.delay = 0;
 	}
 
+	err = acquire_ext_mutex(dev);
+	if(err)
+	{
+		return err;
+	}
+
 	acquire(dev);
 
     /* Perform reset sequence as we have seen that fetching
      * JEDEC ID failed otherwise. */
     err =  perform_reset_sequence(dev);
     if (err != 0) {
+		LOG_ERR("perform_reset_sequence, err: %d", err);
         return err;
     }
 
@@ -643,6 +729,7 @@ static int spi_flash_en25_init(const struct device *dev)
     /* Check jedec ID, this should not fail */
 	err = check_jedec_id(dev);
     if (err != 0) {
+		LOG_ERR("check_jedec_id, err: %d", err);
         return err;
     }
 
@@ -650,6 +737,13 @@ static int spi_flash_en25_init(const struct device *dev)
     //err = disable_block_protect(dev);
 
 	release(dev);
+
+	err = release_ext_mutex(dev);
+	if(err)
+	{
+		return err;
+	}
+
 	return err;
 }
 
@@ -666,6 +760,13 @@ static int spi_flash_en25_pm_control(const struct device *dev,
 		uint32_t new_state = *((const uint32_t *)context);
 
 		if (new_state != dev_data->pm_state) {
+
+			err = acquire_ext_mutex(dev);
+			if(err)
+			{
+				return err;
+			}
+
 			switch (new_state) {
 			case DEVICE_PM_ACTIVE_STATE:
 				acquire(dev);
@@ -691,6 +792,12 @@ static int spi_flash_en25_pm_control(const struct device *dev,
 
 			default:
 				return -ENOTSUP;
+			}
+
+			err = release_ext_mutex(dev);
+			if(err)
+			{
+				return err;
 			}
 
 			dev_data->pm_state = new_state;
