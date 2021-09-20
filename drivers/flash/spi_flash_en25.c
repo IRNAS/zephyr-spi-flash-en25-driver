@@ -10,7 +10,9 @@
 #include <sys/byteorder.h>
 #include <logging/log.h>
 
+#ifdef CONFIG_NRFX_SPIM_EXT_MUTEX
 #include <spi_external_mutex.h>
+#endif
 
 LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 
