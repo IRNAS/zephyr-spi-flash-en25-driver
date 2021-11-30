@@ -16,7 +16,7 @@ Before you get started, you'll need to install the nRF Connect SDK. Here are the
 
 If you already have a NCS setup you can follow these steps:
 
-1. To get the LR1110 modem library we need to update `<path to ncs>/ncs/nrf/west.yml`. First in the `remotes` section add:
+1. To get the driver we need to update `<path to ncs>/ncs/nrf/west.yml`. First in the `remotes` section add:
 
    ```yaml
     - name: irnas
