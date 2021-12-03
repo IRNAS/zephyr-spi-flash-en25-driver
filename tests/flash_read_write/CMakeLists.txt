@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.13.1)
 find_package(Zephyr HINTS $ENV{ZEPHYR_BASE})
 
-project(LR1110_modem_lib)
+project(flash_read_write)
 
 zephyr_compile_options(-fdiagnostics-color=always)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
