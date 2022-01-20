@@ -15,14 +15,15 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 
 ### Changed
 
--   Power managment control due to API changes in NCS 1.8.
+-   Power managment control due to API changes in NCS 1.8. This means that this version of the driver is not compatible with older NCS versions anymore.
 -   Driver does not fail at init if the wrong jedec id is read at init, but it will report the error over logging.
 -   Driver will perform jedec id check at the start of flash erase and will throw -ENODEV in case of error.
 -   Infinite loop in `wait_until_ready` has been replaced with the 10 second timeout.
 
 ### Extra
 
-- Above changes related to jedec check id should be removed when the lr1110 driver is rewritten with zephyr API or when a way to move flash driver init after the lr1110 driver init is found.
+-   Above changes related to jedec check id should be removed when the lr1110 driver is rewritten with zephyr API or when a way to move flash driver init after the lr1110 driver init is found.
+
 
 [Unreleased]: https://github.com/IRNAS/pacsana-bracelet-firmware/compare/v2.0.0...HEAD
 
