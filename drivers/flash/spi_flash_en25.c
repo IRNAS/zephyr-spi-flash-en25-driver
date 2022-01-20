@@ -16,6 +16,8 @@
 
 LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 
+#define DT_DRV_COMPAT irnas_en25
+
 /* EN25 commands used by this driver: */
 /* - Main Memory Byte/Page Program through Buffer 1 without Built-In Erase */
 /* - Ultra-Deep Power-Down */
@@ -39,7 +41,7 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 /* - Status Register Write Command */
 #define CMD_WRITE_STATUS		0x01
 /* - Chip Erase Command */
-#define CMD_READ		        0x03    
+#define CMD_READ		        0x03
 /* - Page Program (Continuous Write) Command */
 #define CMD_PAGE_PROGRAM	    0x02
 /* - Chip erase Command */
@@ -57,12 +59,17 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 /* - Exit from Deep Power-Down Command */
 #define CMD_EXIT_DPD		    0xAB
 
+#define INST_HAS_WP_OR(inst) DT_INST_NODE_HAS_PROP(inst, wp_gpios) ||
+#define ANY_INST_HAS_WP_GPIOS DT_INST_FOREACH_STATUS_OKAY(INST_HAS_WP_OR) 0
 
+#define INST_HAS_HOLD_OR(inst) DT_INST_NODE_HAS_PROP(inst, hold_gpios) ||
+#define ANY_INST_HAS_HOLD_GPIOS DT_INST_FOREACH_STATUS_OKAY(INST_HAS_HOLD_OR) 0
 
 #define STATUS_REG_WRITE_IN_PROGRESS	0x01
 
 #define STATUS_REG_LSB_PAGE_SIZE_BIT	0x01
 
+#define FLASH_EN25_TIMEOUT              10000
 
 #define DEF_BUF_SET(_name, _buf_array)      \
 	const struct spi_buf_set _name = {      \
@@ -79,12 +86,19 @@ struct spi_flash_en25_data {
 #endif
 };
 
+
 struct spi_flash_en25_config {
 	const char *spi_bus;
 	struct spi_config spi_cfg;
 	const char *cs_gpio;
 	gpio_pin_t cs_pin;
 	gpio_dt_flags_t cs_dt_flags;
+#if ANY_INST_HAS_WP_GPIOS
+	const struct gpio_dt_spec *wp;
+#endif
+#if ANY_INST_HAS_HOLD_GPIOS
+	const struct gpio_dt_spec *hold;
+#endif
 #if IS_ENABLED(CONFIG_FLASH_PAGE_LAYOUT)
 	struct flash_pages_layout pages_layout;
 #endif
@@ -108,7 +122,7 @@ static struct spi_flash_en25_data *get_dev_data(const struct device *dev)
 	return dev->data;
 }
 
-static const struct 
+static const struct
 spi_flash_en25_config *get_dev_config(const struct device *dev)
 {
 	return dev->config;
@@ -258,14 +272,26 @@ static int wait_until_ready(const struct device *dev)
 	int err;
 	uint8_t status;
 
-	do {
+    for(int i = 0; i < FLASH_EN25_TIMEOUT; i++)
+    {
+        err = read_status_register(dev, &status);
+        if(err != 0 || !(status & STATUS_REG_WRITE_IN_PROGRESS))
+        {
+            return err;
+        }
+        k_msleep(1);
+    }
+// Replace infinite while loop with timout for loop
+/*
+    do {
 		err = read_status_register(dev, &status);
 	} while (err == 0 && (status & STATUS_REG_WRITE_IN_PROGRESS));
+*/
 
 	return err;
 }
 
-static int send_cmd_op(const struct device *dev, 
+static int send_cmd_op(const struct device *dev,
                        uint8_t opcode,
 			           uint32_t delay)
 {
@@ -590,6 +616,10 @@ static int spi_flash_en25_erase(const struct device *dev, off_t offset,
 		return -ENODEV;
 	}
 
+    LOG_INF("Check ID!");
+    if (check_jedec_id(dev)){
+        return -ENODEV;
+    }
 	/* Diagnose region errors before starting to erase. */
 	if (((offset % cfg->page_size) != 0)
 	    || ((size % cfg->page_size) != 0)) {
@@ -691,6 +721,31 @@ static int spi_flash_en25_init(const struct device *dev)
 		return -ENODEV;
 	}
 
+	/* GPIO configure */
+
+#if ANY_INST_HAS_WP_GPIOS
+	if (dev_config->wp) {
+		if (gpio_pin_configure_dt(dev_config->wp,
+					GPIO_OUTPUT_ACTIVE)) {
+			LOG_ERR("Couldn't configure write protect pin");
+			return -ENODEV;
+		}
+		gpio_pin_set(dev_config->wp->port, dev_config->wp->pin, 1);
+	}
+#endif
+
+#if ANY_INST_HAS_HOLD_GPIOS
+	if (dev_config->hold) {
+		if (gpio_pin_configure_dt(dev_config->hold,
+					GPIO_OUTPUT_ACTIVE)) {
+			LOG_ERR("Couldn't configure hold pin");
+			return -ENODEV;
+		}
+		gpio_pin_set(dev_config->hold->port, dev_config->hold->pin, 1);
+	}
+#endif
+
+    NRF_P0->PIN_CNF[dev_config->cs_pin] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos);
 	if (dev_config->cs_gpio) {
 		dev_data->spi_cs.gpio_dev =
 			device_get_binding(dev_config->cs_gpio);
@@ -731,8 +786,9 @@ static int spi_flash_en25_init(const struct device *dev)
     /* Check jedec ID, this should not fail */
 	err = check_jedec_id(dev);
     if (err != 0) {
-		LOG_ERR("check_jedec_id, err: %d", err);
-        return err;
+		LOG_ERR("Problem, flash driver will not assert error, however flash init failed!");
+        //return err;
+        err = 0;
     }
 
     /* Place holder for function call, we might need it in future. */
@@ -751,69 +807,33 @@ static int spi_flash_en25_init(const struct device *dev)
 
 #if IS_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT)
 static int spi_flash_en25_pm_control(const struct device *dev,
-				     uint32_t ctrl_command,
-				     void *context, device_pm_cb cb, void *arg)
+				     enum pm_device_action action)
 {
-	struct spi_flash_en25_data *dev_data = get_dev_data(dev);
 	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
-	int err = 0;
 
-	if (ctrl_command == DEVICE_PM_SET_POWER_STATE) {
-		uint32_t new_state = *((const uint32_t *)context);
+    int err = 0;
+	err = acquire_ext_mutex(dev);
+	switch (action) {
+	case PM_DEVICE_ACTION_RESUME:
+		acquire(dev);
+        send_cmd_op(dev, CMD_EXIT_DPD, dev_config->t_exit_dpd);
+        release(dev);
+		break;
 
-		if (new_state != dev_data->pm_state) {
+	case PM_DEVICE_ACTION_SUSPEND:
+		acquire(dev);
+		send_cmd_op(dev, CMD_ENTER_DPD, dev_config->t_enter_dpd);
+		release(dev);
+		break;
 
-			err = acquire_ext_mutex(dev);
-			if(err)
-			{
-				return err;
-			}
-
-			switch (new_state) {
-			case DEVICE_PM_ACTIVE_STATE:
-				acquire(dev);
-				send_cmd_op(dev, CMD_EXIT_DPD, dev_config->t_exit_dpd);
-				release(dev);
-				break;
-
-			case DEVICE_PM_LOW_POWER_STATE:
-				acquire(dev);
-				send_cmd_op(dev,
-				            CMD_ENTER_DPD,
-					        dev_config->t_enter_dpd);
-				release(dev);
-				break;
-			case DEVICE_PM_SUSPEND_STATE:
-			case DEVICE_PM_OFF_STATE:
-				acquire(dev);
-				send_cmd_op(dev,
-				            CMD_ENTER_DPD,
-					        dev_config->t_enter_dpd);
-				release(dev);
-				break;
-
-			default:
-				return -ENOTSUP;
-			}
-
-			err = release_ext_mutex(dev);
-			if(err)
-			{
-				return err;
-			}
-
-			dev_data->pm_state = new_state;
-		}
-	} else {
-		__ASSERT_NO_MSG(ctrl_command == DEVICE_PM_GET_POWER_STATE);
-		*((uint32_t *)context) = dev_data->pm_state;
+	default:
+		return -ENOTSUP;
 	}
-
-	if (cb) {
-		cb(dev, err, context, arg);
+	err = release_ext_mutex(dev);
+	if(err)
+	{
+		return err;
 	}
-
-	return err;
 }
 #endif /* IS_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT) */
 
@@ -841,6 +861,22 @@ static const struct flash_driver_api spi_flash_en25_api = {
 #define XSTR(x) STR(x)
 #define STR(x) #x
 
+#define INST_HAS_WP_GPIO(idx) \
+	DT_NODE_HAS_PROP(DT_DRV_INST(idx), wp_gpios)
+
+#define INST_WP_GPIO_SPEC(idx)						\
+	IF_ENABLED(INST_HAS_WP_GPIO(idx),				\
+		(static const struct gpio_dt_spec wp_##idx =		\
+		GPIO_DT_SPEC_GET(DT_DRV_INST(idx), wp_gpios);))
+
+#define INST_HAS_HOLD_GPIO(idx) \
+	DT_NODE_HAS_PROP(DT_DRV_INST(idx), hold_gpios)
+
+#define INST_HOLD_GPIO_SPEC(idx)						\
+	IF_ENABLED(INST_HAS_HOLD_GPIO(idx),				\
+		(static const struct gpio_dt_spec hold_##idx =		\
+		GPIO_DT_SPEC_GET(DT_DRV_INST(idx), hold_gpios);))
+
 #define SPI_FLASH_EN25_INST(idx)					                    \
 	enum {								                                \
 		INST_##idx##_BYTES = (DT_INST_PROP(idx, size) / 8),	            \
@@ -850,8 +886,10 @@ static const struct flash_driver_api spi_flash_en25_api = {
 	static struct spi_flash_en25_data inst_##idx##_data = {		        \
 		.lock = Z_SEM_INITIALIZER(inst_##idx##_data.lock, 1, 1),        \
 		IF_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT, (		            \
-			.pm_state = DEVICE_PM_ACTIVE_STATE))		                \
-	};								                                    \
+			.pm_state = PM_DEVICE_STATE_ACTIVE))		                \
+	}; \
+	INST_WP_GPIO_SPEC(idx)	\
+	INST_HOLD_GPIO_SPEC(idx)	\
 	static const struct spi_flash_en25_config inst_##idx##_config = {   \
 		.spi_bus = DT_INST_BUS_LABEL(idx),			                    \
 		.spi_cfg = {						                            \
@@ -865,6 +903,10 @@ static const struct flash_driver_api spi_flash_en25_api = {
 			.cs_gpio = DT_INST_SPI_DEV_CS_GPIOS_LABEL(idx),             \
 			.cs_pin  = DT_INST_SPI_DEV_CS_GPIOS_PIN(idx),	            \
 			.cs_dt_flags = DT_INST_SPI_DEV_CS_GPIOS_FLAGS(idx),))       \
+		IF_ENABLED(INST_HAS_WP_GPIO(idx),			\
+			(.wp = &wp_##idx,))			\
+		IF_ENABLED(INST_HAS_HOLD_GPIO(idx),			\
+			(.hold = &hold_##idx,))			\
 		IF_ENABLED(CONFIG_FLASH_PAGE_LAYOUT, (			                \
 			.pages_layout = {				                            \
 				.pages_count = INST_##idx##_PAGES,	                    \

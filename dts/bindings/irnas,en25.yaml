@@ -62,3 +62,13 @@ properties:
       Time, in nanoseconds, needed by the chip to exit from the Deep Power-Down
       mode (or Ultra-Deep Power-Down mode when the "use-udpd" property is set)
       after the corresponding command is issued.
+
+  wp-gpios:
+    type: phandle-array
+    required: false
+    description: WPn pin
+    
+  hold-gpios:
+    type: phandle-array
+    required: false
+    description: HOLDn pin
