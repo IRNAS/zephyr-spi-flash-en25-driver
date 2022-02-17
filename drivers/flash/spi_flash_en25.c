@@ -801,32 +801,36 @@ static int spi_flash_en25_pm_control(const struct device *dev,
 	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
 
     int err = 0;
-	err = acquire_ext_mutex(dev);
-	if(err)
+	int m_err = acquire_ext_mutex(dev);
+	if(m_err)
 	{
-		return err;
+		return m_err;
 	}
+	acquire(dev);
+
 	switch (action) {
 	case PM_DEVICE_ACTION_RESUME:
-		acquire(dev);
         send_cmd_op(dev, CMD_EXIT_DPD, dev_config->t_exit_dpd);
-        release(dev);
 		break;
 
 	case PM_DEVICE_ACTION_SUSPEND:
 		acquire(dev);
 		send_cmd_op(dev, CMD_ENTER_DPD, dev_config->t_enter_dpd);
-		release(dev);
 		break;
 
 	default:
-		return -ENOTSUP;
+		err = -ENOTSUP;
 	}
-	err = release_ext_mutex(dev);
-	if(err)
+
+	release(dev);
+
+	m_err = release_ext_mutex(dev);
+	if(m_err)
 	{
-		return err;
+		return m_err;
 	}
+
+	return err;
 }
 #endif /* IS_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT) */
 
