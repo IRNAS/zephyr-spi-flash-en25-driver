@@ -734,8 +734,6 @@ static int spi_flash_en25_init(const struct device *dev)
 	}
 #endif
 
-	// TODO: remove bellow line
-    // NRF_P0->PIN_CNF[dev_config->cs_pin] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos);
 	if (dev_config->cs_gpio) {
 		dev_data->spi_cs.gpio_dev =
 			device_get_binding(dev_config->cs_gpio);
