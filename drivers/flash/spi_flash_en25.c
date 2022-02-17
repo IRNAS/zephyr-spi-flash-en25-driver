@@ -69,8 +69,6 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 
 #define STATUS_REG_LSB_PAGE_SIZE_BIT	0x01
 
-#define FLASH_EN25_TIMEOUT              10000
-
 #define DEF_BUF_SET(_name, _buf_array)      \
 	const struct spi_buf_set _name = {      \
 		.buffers = _buf_array,              \
@@ -160,7 +158,7 @@ static int acquire_ext_mutex(const struct device *dev)
 	{
 		return err;
 	}
-	// LOG_INF("Spi ext mutex acquired");
+	LOG_DBG("Spi ext mutex acquired");
 #endif
 	return 0;
 }
@@ -174,7 +172,7 @@ static int release_ext_mutex(const struct device *dev)
 		LOG_ERR("spi_ext_mutex_release, err: %d", err);
 		return err;
 	}
-	// LOG_INF("Spi ext mutex released");
+	LOG_DBG("Spi ext mutex released");
 #endif
 	return 0;
 }
@@ -272,7 +270,7 @@ static int wait_until_ready(const struct device *dev)
 	int err;
 	uint8_t status;
 
-    for(int i = 0; i < FLASH_EN25_TIMEOUT; i++)
+    for(int i = 0; i < CONFIG_SPI_FLASH_EN25_READY_TIMEOUT; i++)
     {
         err = read_status_register(dev, &status);
         if(err != 0 || !(status & STATUS_REG_WRITE_IN_PROGRESS))
@@ -281,14 +279,9 @@ static int wait_until_ready(const struct device *dev)
         }
         k_msleep(1);
     }
-// Replace infinite while loop with timout for loop
-/*
-    do {
-		err = read_status_register(dev, &status);
-	} while (err == 0 && (status & STATUS_REG_WRITE_IN_PROGRESS));
-*/
 
-	return err;
+	// we are out of the loop so we have timed out
+	return -ETIMEDOUT;
 }
 
 static int send_cmd_op(const struct device *dev,
@@ -382,10 +375,10 @@ static int spi_flash_en25_read(const struct device *dev, off_t offset,
 	DEF_BUF_SET(tx_buf_set, tx_buf);
 	DEF_BUF_SET(rx_buf_set, rx_buf);
 
-	err = acquire_ext_mutex(dev);
-	if(err)
+	int m_err = acquire_ext_mutex(dev);
+	if(m_err)
 	{
-		return err;
+		return m_err;
 	}
 
 	acquire(dev);
@@ -394,10 +387,10 @@ static int spi_flash_en25_read(const struct device *dev, off_t offset,
 			     &tx_buf_set, &rx_buf_set);
 	release(dev);
 
-	err = release_ext_mutex(dev);
-	if(err)
+	m_err = release_ext_mutex(dev);
+	if(m_err)
 	{
-		return err;
+		return m_err;
 	}
 
 	if (err != 0) {
@@ -458,10 +451,10 @@ static int spi_flash_en25_write(const struct device *dev, off_t offset,
 		return -ENODEV;
 	}
 
-	err = acquire_ext_mutex(dev);
-	if(err)
+	int m_err = acquire_ext_mutex(dev);
+	if(m_err)
 	{
-		return err;
+		return m_err;
 	}
 
 	acquire(dev);
@@ -488,10 +481,10 @@ static int spi_flash_en25_write(const struct device *dev, off_t offset,
 
 	release(dev);
 
-	err = release_ext_mutex(dev);
-	if(err)
+	m_err = release_ext_mutex(dev);
+	if(m_err)
 	{
-		return err;
+		return m_err;
 	}
 
 	return err;
@@ -616,20 +609,16 @@ static int spi_flash_en25_erase(const struct device *dev, off_t offset,
 		return -ENODEV;
 	}
 
-    LOG_INF("Check ID!");
-    if (check_jedec_id(dev)){
-        return -ENODEV;
-    }
 	/* Diagnose region errors before starting to erase. */
 	if (((offset % cfg->page_size) != 0)
 	    || ((size % cfg->page_size) != 0)) {
 		return -EINVAL;
 	}
 
-	err = acquire_ext_mutex(dev);
-	if(err)
+	int m_err = acquire_ext_mutex(dev);
+	if(m_err)
 	{
-		return err;
+		return m_err;
 	}
 
 	acquire(dev);
@@ -671,10 +660,10 @@ static int spi_flash_en25_erase(const struct device *dev, off_t offset,
 
 	release(dev);
 
-	err = release_ext_mutex(dev);
-	if(err)
+	m_err = release_ext_mutex(dev);
+	if(m_err)
 	{
-		return err;
+		return m_err;
 	}
 
 	return err;
@@ -745,7 +734,8 @@ static int spi_flash_en25_init(const struct device *dev)
 	}
 #endif
 
-    NRF_P0->PIN_CNF[dev_config->cs_pin] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos);
+	// TODO: remove bellow line
+    // NRF_P0->PIN_CNF[dev_config->cs_pin] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos);
 	if (dev_config->cs_gpio) {
 		dev_data->spi_cs.gpio_dev =
 			device_get_binding(dev_config->cs_gpio);
@@ -759,10 +749,10 @@ static int spi_flash_en25_init(const struct device *dev)
 		dev_data->spi_cs.delay = 0;
 	}
 
-	err = acquire_ext_mutex(dev);
-	if(err)
+	int m_err = acquire_ext_mutex(dev);
+	if(m_err)
 	{
-		return err;
+		return m_err;
 	}
 
 	acquire(dev);
@@ -772,6 +762,7 @@ static int spi_flash_en25_init(const struct device *dev)
     err =  perform_reset_sequence(dev);
     if (err != 0) {
 		LOG_ERR("perform_reset_sequence, err: %d", err);
+		release_ext_mutex(dev);
         return err;
     }
 
@@ -796,10 +787,10 @@ static int spi_flash_en25_init(const struct device *dev)
 
 	release(dev);
 
-	err = release_ext_mutex(dev);
-	if(err)
+	m_err = release_ext_mutex(dev);
+	if(m_err)
 	{
-		return err;
+		return m_err;
 	}
 
 	return err;
@@ -813,6 +804,10 @@ static int spi_flash_en25_pm_control(const struct device *dev,
 
     int err = 0;
 	err = acquire_ext_mutex(dev);
+	if(err)
+	{
+		return err;
+	}
 	switch (action) {
 	case PM_DEVICE_ACTION_RESUME:
 		acquire(dev);
