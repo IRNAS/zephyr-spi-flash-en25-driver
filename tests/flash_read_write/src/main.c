@@ -269,7 +269,7 @@ static void test_low_power() {
     int err;
     flash_dev = device_get_binding(FLASH_DEVICE);
 
-#if IS_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT)
+#if IS_ENABLED(CONFIG_PM_DEVICE)
     printk("Putting the flash device into low power state...\n");
     err = device_set_power_state(flash_dev, DEVICE_PM_LOW_POWER_STATE, NULL,
                                  NULL);

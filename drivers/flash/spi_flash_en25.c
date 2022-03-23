@@ -79,7 +79,7 @@ struct spi_flash_en25_data {
 	const struct device *spi;
 	struct spi_cs_control spi_cs;
 	struct k_sem lock;
-#if IS_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT)
+#if IS_ENABLED(CONFIG_PM_DEVICE)
 	uint32_t pm_state;
 #endif
 };
@@ -794,7 +794,7 @@ static int spi_flash_en25_init(const struct device *dev)
 	return err;
 }
 
-#if IS_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT)
+#if IS_ENABLED(CONFIG_PM_DEVICE)
 static int spi_flash_en25_pm_control(const struct device *dev,
 				     enum pm_device_action action)
 {
@@ -832,7 +832,7 @@ static int spi_flash_en25_pm_control(const struct device *dev,
 
 	return err;
 }
-#endif /* IS_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT) */
+#endif /* IS_ENABLED(CONFIG_PM_DEVICE) */
 
 static const struct flash_parameters *
 flash_en25_get_parameters(const struct device *dev)
@@ -882,7 +882,7 @@ static const struct flash_driver_api spi_flash_en25_api = {
 	};								                                    \
 	static struct spi_flash_en25_data inst_##idx##_data = {		        \
 		.lock = Z_SEM_INITIALIZER(inst_##idx##_data.lock, 1, 1),        \
-		IF_ENABLED(CONFIG_DEVICE_POWER_MANAGEMENT, (		            \
+		IF_ENABLED(CONFIG_PM_DEVICE, (		            \
 			.pm_state = PM_DEVICE_STATE_ACTIVE))		                \
 	}; \
 	INST_WP_GPIO_SPEC(idx)	\
