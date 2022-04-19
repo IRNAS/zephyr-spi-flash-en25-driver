@@ -814,7 +814,6 @@ static int spi_flash_en25_pm_control(const struct device *dev,
 		break;
 
 	case PM_DEVICE_ACTION_SUSPEND:
-		acquire(dev);
 		send_cmd_op(dev, CMD_ENTER_DPD, dev_config->t_enter_dpd);
 		break;
 
