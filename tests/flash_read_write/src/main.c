@@ -1,3 +1,4 @@
+#include "pm/device.h"
 #include <devicetree.h>
 #include <drivers/flash.h>
 #include <drivers/gpio.h>
@@ -6,9 +7,9 @@
 #include <zephyr.h>
 #include <ztest.h>
 
-#define FLASH_DEVICE DT_LABEL(DT_NODELABEL(flash42))
-#define CHIP_SIZE DT_PROP(DT_NODELABEL(flash42), size)
-#define PAGE_SIZE DT_PROP(DT_NODELABEL(flash42), page_size)
+#define FLASH_DEVICE DT_LABEL(DT_NODELABEL(en25qh32b))
+#define CHIP_SIZE DT_PROP(DT_NODELABEL(en25qh32b), size)
+#define PAGE_SIZE DT_PROP(DT_NODELABEL(en25qh32b), page_size)
 
 #define TEST_REGION_OFFSET 0xFE00
 #define TEST_REGION_SIZE 0x1200
@@ -169,7 +170,7 @@ static void test_erase_read_write() {
     }
 }
 
-#define TEST_AREA_MAX DT_PROP(DT_NODELABEL(flash42), size)
+#define TEST_AREA_MAX DT_PROP(DT_NODELABEL(en25qh32b), size)
 #define EXPECTED_SIZE 1024
 #define CANARY 0xff
 
@@ -271,8 +272,7 @@ static void test_low_power() {
 
 #if IS_ENABLED(CONFIG_PM_DEVICE)
     printk("Putting the flash device into low power state...\n");
-    err = device_set_power_state(flash_dev, DEVICE_PM_LOW_POWER_STATE, NULL,
-                                 NULL);
+    err = pm_device_state_set(flash_dev, PM_DEVICE_STATE_OFF);
     zassert_equal(err, 0, "Setting low power mode failed");
 #endif
 }
