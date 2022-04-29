@@ -167,7 +167,7 @@ static int release_ext_mutex(const struct device *dev)
 {
 #ifdef CONFIG_NRFX_SPIM_EXT_MUTEX
 	int err = spi_ext_mutex_release(get_dev_data(dev)->spi);
-	if (errno != 0)
+	if (err != 0)
 	{
 		LOG_ERR("spi_ext_mutex_release, err: %d", err);
 		return err;
