@@ -7,6 +7,7 @@
 #include <drivers/flash.h>
 #include <drivers/spi.h>
 #include <logging/log.h>
+#include <pm/device.h>
 #include <sys/byteorder.h>
 #include <zephyr.h>
 
@@ -815,8 +816,10 @@ static const struct flash_driver_api spi_flash_en25_api = {
 				 "Page size specified for instance " #idx " of "                   \
 				 "atmel,at45 is not compatible with its "                          \
 				 "total size");))                                                  \
-	DEVICE_DEFINE(inst_##idx, DT_INST_LABEL(idx), spi_flash_en25_init,                         \
-		      spi_flash_en25_pm_control, &inst_##idx##_data, &inst_##idx##_config,         \
-		      POST_KERNEL, CONFIG_SPI_FLASH_EN25_INIT_PRIORITY, &spi_flash_en25_api);
+	PM_DEVICE_DT_INST_DEFINE(idx, spi_flash_en25_pm_control);                                  \
+                                                                                                   \
+	DEVICE_DT_INST_DEFINE(idx, spi_flash_en25_init, PM_DEVICE_DT_INST_GET(idx),                \
+			      &inst_##idx##_data, &inst_##idx##_config, POST_KERNEL,               \
+			      CONFIG_SPI_FLASH_EN25_INIT_PRIORITY, &spi_flash_en25_api);
 
 DT_INST_FOREACH_STATUS_OKAY(SPI_FLASH_EN25_INST)
