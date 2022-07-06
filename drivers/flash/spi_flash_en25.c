@@ -654,14 +654,14 @@ static int spi_flash_en25_init(const struct device *dev)
 #endif
 
 	if (dev_config->cs_gpio) {
-		dev_data->spi_cs.gpio_dev = device_get_binding(dev_config->cs_gpio);
-		if (!dev_data->spi_cs.gpio_dev) {
+		dev_data->spi_cs.gpio.port = device_get_binding(dev_config->cs_gpio);
+		if (!dev_data->spi_cs.gpio.port) {
 			LOG_ERR("Cannot find %s", dev_config->cs_gpio);
 			return -ENODEV;
 		}
 
-		dev_data->spi_cs.gpio_pin = dev_config->cs_pin;
-		dev_data->spi_cs.gpio_dt_flags = dev_config->cs_dt_flags;
+		dev_data->spi_cs.gpio.pin = dev_config->cs_pin;
+		dev_data->spi_cs.gpio.dt_flags = dev_config->cs_dt_flags;
 		dev_data->spi_cs.delay = 0;
 	}
 
