@@ -1,5 +1,5 @@
 /*
- * COPYRIGHT NOTICE: (c) 2021 Irnas.  All rights reserved.
+ * COPYRIGHT NOTICE: (c) 2022 Irnas.  All rights reserved.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
