@@ -269,7 +269,7 @@ static void test_low_power()
 
 #if IS_ENABLED(CONFIG_PM_DEVICE)
 	printk("Putting the flash device into low power state...\n");
-	err = pm_device_state_set(flash_dev, PM_DEVICE_STATE_OFF);
+	err = pm_device_action_run(flash_dev, PM_DEVICE_ACTION_SUSPEND);
 	zassert_equal(err, 0, "Setting low power mode failed");
 #endif
 }
