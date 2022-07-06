@@ -592,23 +592,6 @@ static int spi_flash_en25_erase(const struct device *dev, off_t offset, size_t s
 	return err;
 }
 
-static int spi_flash_en25_write_protection(const struct device *dev, bool enable)
-{
-	ARG_UNUSED(dev);
-	ARG_UNUSED(enable);
-
-	/* The Sector Protection mechanism that is available in en25 family
-	 * chips is more complex than what is exposed by the the flash API
-	 * (particular sectors need to be earlier configured in a write to
-	 * the nonvolatile Sector Protection Register), so it is not feasible
-	 * to try to use it here. Since the protection is not automatically
-	 * enabled after the device is power cycled, there is nothing needed
-	 * to be done in this function.
-	 */
-
-	return 0;
-}
-
 #if IS_ENABLED(CONFIG_FLASH_PAGE_LAYOUT)
 static void spi_flash_en25_pages_layout(const struct device *dev,
 					const struct flash_pages_layout **layout,
@@ -759,7 +742,6 @@ static const struct flash_driver_api spi_flash_en25_api = {
 	.read = spi_flash_en25_read,
 	.write = spi_flash_en25_write,
 	.erase = spi_flash_en25_erase,
-	.write_protection = spi_flash_en25_write_protection,
 	.get_parameters = flash_en25_get_parameters,
 #if IS_ENABLED(CONFIG_FLASH_PAGE_LAYOUT)
 	.page_layout = spi_flash_en25_pages_layout,
