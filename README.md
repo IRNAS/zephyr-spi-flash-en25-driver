@@ -30,7 +30,7 @@ If you already have a NCS setup you can follow these steps:
       repo-path: zephyr-spi-flash-en25-driver
       path: irnas/zephyr-spi-flash-en25-driver
       remote: irnas
-      revision: v2.0.2
+      revision: v2.1.0
     ```
 
 3. Then run `west update` in your freshly created bash/command prompt session.
