@@ -30,11 +30,38 @@ If you already have a NCS setup you can follow these steps:
       repo-path: zephyr-spi-flash-en25-driver
       path: irnas/zephyr-spi-flash-en25-driver
       remote: irnas
-      revision: v2.0.2
+      revision: v2.1.0
     ```
 
 3. Then run `west update` in your freshly created bash/command prompt session.
 4. Above command will clone `zephyr-spi-flash-en25-driver` repository inside of `ncs/irnas/`. You can now run samples inside it and use its en25 driver code in your application projects.
+
+5. Add the flash DTS entry to your board definition or overlay file. For example:
+
+```dts
+
+&spi0 {
+   // ...
+
+    en25: en25qh32b@0 {
+        reg = <0>;
+        label = "EN25QH32B";
+        status = "okay";
+        compatible = "irnas,en25";
+
+        jedec-id = [1c 70 16];
+        size = <33554432>;
+        sector-size = <4096>;
+        block-size = <4096>;
+        page-size = <256>;
+        spi-max-frequency = <104000000>;
+
+        enter-dpd-delay = <30>;
+        exit-dpd-delay = <30>;
+    };
+};
+
+```
 
 ## Tests
 
