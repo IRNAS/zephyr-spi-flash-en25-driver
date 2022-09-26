@@ -18,20 +18,32 @@ properties:
     required: true
     description: Flash capacity in bits.
 
-  sector-size:
+  write-sector-size:
     type: int
     required: true
-    description: Flash sector size in bytes.
+    description: |
+      Write sector size (in bytes). This might be called "programmable page" or
+      something similar in the datasheet.
 
-  block-size:
+  erase-full-block-size:
     type: int
     required: true
-    description: Flash block size in bytes.
+    description: |
+      The size (in bytes) of a full block for erase purposes.
 
-  page-size:
+  erase-half-block-size:
     type: int
     required: true
-    description: Flash page size in bytes.
+    description: |
+      The size (in bytes) of a half block for erase purposes.
+
+  erase-sector-size:
+    type: int
+    required: true
+    description: |
+      The size (in bytes) of a sector for erase purposes. This size
+      should be the smallest erasable sector/block/page that the chip supports.
+      NOTE: This driver assumes a uniform sector architecture.
 
   use-udpd:
     type: boolean
@@ -67,7 +79,7 @@ properties:
     type: phandle-array
     required: false
     description: WPn pin
-    
+
   hold-gpios:
     type: phandle-array
     required: false
