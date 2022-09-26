@@ -7,6 +7,8 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 
 ## [Unreleased]
 
+## [3.0.0] - 2022-09-26
+
 ### Changed
 
 -   Rework how sector sizes are specified in DTS.
@@ -45,7 +47,7 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 
 ### Fixed
 
- - Fixed spi_flash_en25_pm_control not behaving correctly and not returning any value at the end of the function.
+-   Fixed spi_flash_en25_pm_control not behaving correctly and not returning any value at the end of the function.
 
 ## [2.0.1] - 2022-02-17
 
@@ -74,13 +76,20 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 
 -   Above changes related to jedec check id should be removed when the lr1110 driver is rewritten with zephyr API or when a way to move flash driver init after the lr1110 driver init is found.
 
+[Unreleased]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v3.0.0...HEAD
 
-[Unreleased]: https://github.com/IRNAS/pacsana-bracelet-firmware/compare/v2.1.0...HEAD
+[3.0.0]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare//v2.1.0...v3.0.0
 
 [2.1.0]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v2.0.5.../v2.1.0
+
 [2.0.5]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v2.0.4.../v2.0.5
+
 [2.0.4]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v2.0.3.../v2.0.4
+
 [2.0.3]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v2.0.2.../v2.0.3
+
 [2.0.2]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v2.0.1.../v2.0.2
+
 [2.0.1]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v2.0.0.../v2.0.1
+
 [2.0.0]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v1.1.1.../v2.0.0
