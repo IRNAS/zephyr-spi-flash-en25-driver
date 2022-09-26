@@ -30,7 +30,7 @@ If you already have a NCS setup you can follow these steps:
       repo-path: zephyr-spi-flash-en25-driver
       path: irnas/zephyr-spi-flash-en25-driver
       remote: irnas
-      revision: v2.1.0
+      revision: v3.0.0
     ```
 
 3. Then run `west update` in your freshly created bash/command prompt session.
@@ -43,21 +43,27 @@ If you already have a NCS setup you can follow these steps:
 &spi0 {
    // ...
 
-    en25: en25qh32b@0 {
+    en25qh32b: en25qh32b@0 {
         reg = <0>;
         label = "EN25QH32B";
         status = "okay";
         compatible = "irnas,en25";
 
-        jedec-id = [1c 70 16];
-        size = <33554432>;
-        sector-size = <4096>;
-        block-size = <4096>;
-        page-size = <256>;
-        spi-max-frequency = <104000000>;
+        jedec-id = [ 1c 70 16  ];  // EN25
+        size = <(4194304 * 8)>;
+
+        write-sector-size = <256>;
+        erase-full-block-size = <65536>;
+        erase-half-block-size = <32768>;
+        erase-sector-size = <4096>;
+
+        spi-max-frequency = <4000000>;
 
         enter-dpd-delay = <30>;
         exit-dpd-delay = <30>;
+
+        wp-gpios = <&gpio0 22 0>;
+        hold-gpios = <&gpio0 23 0>;
     };
 };
 
