@@ -7,12 +7,16 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 
 ## [Unreleased]
 
+### Changed
+
+-   Rework how sector sizes are specified in DTS.
+
 ## [2.1.0] - 2022-07-07
 
 ### Changed
 
-- Remove unnecessary board overlays form tests.
-- Migrate code to run on NCS 2.0
+-   Remove unnecessary board overlays form tests.
+-   Migrate code to run on NCS 2.0
 
 ## [2.0.5] - 2022-05-03
 

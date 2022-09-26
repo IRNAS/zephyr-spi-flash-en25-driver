@@ -54,9 +54,9 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 #define CMD_SECTOR_ERASE     0x20
 /* - Full Block Erase (64KB) Command */
 #define CMD_FULL_BLOCK_ERASE 0xD8
-/* - Full Block Erase (64KB) Command */
+/* - Half Block Erase (32KB) Command */
 #define CMD_HALF_BLOCK_ERASE 0x52
-/* - Page Erase */
+/* - Page Erase (4KB) Command */
 #define CMD_PAGE_ERASE	     0x81
 /* - Enter Deep Power-Down Command */
 #define CMD_ENTER_DPD	     0xB9
@@ -104,9 +104,12 @@ struct spi_flash_en25_config {
 	struct flash_pages_layout pages_layout;
 #endif
 	uint32_t chip_size;
-	uint32_t sector_size;
-	uint16_t block_size;
-	uint16_t page_size;
+
+	uint32_t write_sector_size;
+	uint32_t erase_full_block_size;
+	uint32_t erase_half_block_size;
+	uint32_t erase_sector_size;
+
 	uint16_t t_enter_dpd; /* in microseconds */
 	uint16_t t_exit_dpd;  /* in microseconds */
 	bool use_udpd;
@@ -114,7 +117,9 @@ struct spi_flash_en25_config {
 };
 
 static const struct flash_parameters flash_en25_parameters = {
+	/* the smallest number of bytes that can be written at a time*/
 	.write_block_size = 1,
+	/* The value in a byte after an erase operation */
 	.erase_value = 0xff,
 };
 
@@ -410,8 +415,8 @@ static int spi_flash_en25_write(const struct device *dev, off_t offset, const vo
 
 	while (len) {
 		size_t chunk_len = len;
-		off_t current_page_start = offset - (offset & (cfg->page_size - 1));
-		off_t current_page_end = current_page_start + cfg->page_size;
+		off_t current_page_start = offset - (offset & (cfg->write_sector_size - 1));
+		off_t current_page_end = current_page_start + cfg->write_sector_size;
 
 		if (chunk_len > (current_page_end - offset)) {
 			chunk_len = (current_page_end - offset);
@@ -498,9 +503,22 @@ static int perform_chip_erase(const struct device *dev)
 	return (err != 0) ? -EIO : 0;
 }
 
+/**
+ * @brief Check if erase can be performed at this offset with this size
+ *
+ * @param[in] entity_size The size of the erasable entity (block/sector of flash)
+ * @param[in] offset The current offset of the erase operation
+ * @param[in] requested_size The number of bytes to erase
+ *
+ * @retval true The requested erase operation can be performed
+ * @retval false The requested erase operation can NOT be performed
+ */
 static bool is_erase_possible(size_t entity_size, off_t offset, size_t requested_size)
 {
-	return (requested_size >= entity_size && (offset & (entity_size - 1)) == 0);
+	/* 1. The size we want to erase must be the same or larger then the entity size
+	 * 2. The offset must be a multiple of the requested entity size
+	 */
+	return (requested_size >= entity_size) && (offset % entity_size == 0);
 }
 
 static int perform_erase_op(const struct device *dev, uint8_t opcode, off_t offset)
@@ -543,7 +561,7 @@ static int spi_flash_en25_erase(const struct device *dev, off_t offset, size_t s
 	}
 
 	/* Diagnose region errors before starting to erase. */
-	if (((offset % cfg->page_size) != 0) || ((size % cfg->page_size) != 0)) {
+	if (((offset % cfg->erase_sector_size) != 0) || ((size % cfg->erase_sector_size) != 0)) {
 		return -EINVAL;
 	}
 
@@ -558,18 +576,23 @@ static int spi_flash_en25_erase(const struct device *dev, off_t offset, size_t s
 		err = perform_chip_erase(dev);
 	} else {
 		while (size) {
-			if (is_erase_possible(cfg->sector_size, offset, size)) {
-				err = perform_erase_op(dev, CMD_SECTOR_ERASE, offset);
-				offset += cfg->sector_size;
-				size -= cfg->sector_size;
-			} else if (is_erase_possible(cfg->block_size, offset, size)) {
+			/* Can we erase a full block? */
+			if (is_erase_possible(cfg->erase_full_block_size, offset, size)) {
 				err = perform_erase_op(dev, CMD_FULL_BLOCK_ERASE, offset);
-				offset += cfg->block_size;
-				size -= cfg->block_size;
-			} else if (is_erase_possible(cfg->page_size, offset, size)) {
+				offset += cfg->erase_full_block_size;
+				size -= cfg->erase_full_block_size;
+			}
+			/* Can we erase a half block? */
+			else if (is_erase_possible(cfg->erase_half_block_size, offset, size)) {
 				err = perform_erase_op(dev, CMD_HALF_BLOCK_ERASE, offset);
-				offset += cfg->page_size;
-				size -= cfg->page_size;
+				offset += cfg->erase_half_block_size;
+				size -= cfg->erase_half_block_size;
+			}
+			/* Can we erase a sector? */
+			else if (is_erase_possible(cfg->erase_sector_size, offset, size)) {
+				err = perform_erase_op(dev, CMD_SECTOR_ERASE, offset);
+				offset += cfg->erase_sector_size;
+				size -= cfg->erase_sector_size;
 			} else {
 				LOG_ERR("Unsupported erase request: "
 					"size %zu at 0x%lx",
@@ -598,6 +621,9 @@ static void spi_flash_en25_pages_layout(const struct device *dev,
 					const struct flash_pages_layout **layout,
 					size_t *layout_size)
 {
+	/* NOTE: The page size specified in the layout here is the smallest erasable sector of the
+	 * chip, as specified in the zephyr flash API.
+	 */
 	*layout = &get_dev_config(dev)->pages_layout;
 	*layout_size = 1;
 }
@@ -770,7 +796,7 @@ static const struct flash_driver_api spi_flash_en25_api = {
 #define SPI_FLASH_EN25_INST(idx)                                                                   \
 	enum {                                                                                     \
 		INST_##idx##_BYTES = (DT_INST_PROP(idx, size) / 8),                                \
-		INST_##idx##_PAGES = (INST_##idx##_BYTES / DT_INST_PROP(idx, page_size)),          \
+		INST_##idx##_PAGES = (INST_##idx##_BYTES / DT_INST_PROP(idx, erase_sector_size)),  \
 	};                                                                                         \
 	static struct spi_flash_en25_data inst_##idx##_data = {                                    \
 		.lock = Z_SEM_INITIALIZER(inst_##idx##_data.lock, 1, 1),                           \
@@ -797,13 +823,14 @@ static const struct flash_driver_api spi_flash_en25_api = {
 					   (.pages_layout =                                        \
 						    {                                              \
 							    .pages_count = INST_##idx##_PAGES,     \
-							    .pages_size =                          \
-								    DT_INST_PROP(idx, page_size),  \
+							    .pages_size = DT_INST_PROP(            \
+								    idx, erase_sector_size),       \
 						    }, ))                                          \
 					.chip_size = INST_##idx##_BYTES,                           \
-		.sector_size = DT_INST_PROP(idx, sector_size),                                     \
-		.block_size = DT_INST_PROP(idx, block_size),                                       \
-		.page_size = DT_INST_PROP(idx, page_size),                                         \
+		.write_sector_size = DT_INST_PROP(idx, write_sector_size),                         \
+		.erase_full_block_size = DT_INST_PROP(idx, erase_full_block_size),                 \
+		.erase_half_block_size = DT_INST_PROP(idx, erase_half_block_size),                 \
+		.erase_sector_size = DT_INST_PROP(idx, erase_sector_size),                         \
 		.t_enter_dpd =                                                                     \
 			ceiling_fraction(DT_INST_PROP(idx, enter_dpd_delay), NSEC_PER_USEC),       \
 		.t_exit_dpd = ceiling_fraction(DT_INST_PROP(idx, exit_dpd_delay), NSEC_PER_USEC),  \
@@ -811,10 +838,10 @@ static const struct flash_driver_api spi_flash_en25_api = {
 		.jedec_id = DT_INST_PROP(idx, jedec_id),                                           \
 	};                                                                                         \
 	IF_ENABLED(CONFIG_FLASH_PAGE_LAYOUT,                                                       \
-		   (BUILD_ASSERT((INST_##idx##_PAGES * DT_INST_PROP(idx, page_size)) ==            \
+		   (BUILD_ASSERT((INST_##idx##_PAGES * DT_INST_PROP(idx, erase_sector_size)) ==    \
 					 INST_##idx##_BYTES,                                       \
-				 "Page size specified for instance " #idx " of "                   \
-				 "atmel,at45 is not compatible with its "                          \
+				 "erase-sector-size specified for instance " #idx " of "           \
+				 "irnas,en25 is not compatible with its "                          \
 				 "total size");))                                                  \
 	PM_DEVICE_DT_INST_DEFINE(idx, spi_flash_en25_pm_control);                                  \
                                                                                                    \

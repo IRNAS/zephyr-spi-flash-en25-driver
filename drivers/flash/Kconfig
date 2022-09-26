@@ -28,7 +28,7 @@ config SPI_FLASH_EN25_INIT_PRIORITY
 
 config SPI_FLASH_EN25_READY_TIMEOUT
 	int "Max duration to wait for ready status of en25 in milliseconds"
-	default 10000
+	default 50000
 	help
 	  For some operations the driver must wait for en25 to become ready.
 	  This config specifies the maximum duration the driver will wait.
