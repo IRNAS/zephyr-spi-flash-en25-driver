@@ -7,17 +7,21 @@
 #include <zephyr.h>
 #include <ztest.h>
 
-#define FLASH_DEVICE DT_LABEL(DT_NODELABEL(en25qh32b))
-#define CHIP_SIZE    DT_PROP(DT_NODELABEL(en25qh32b), size)
-#define PAGE_SIZE    DT_PROP(DT_NODELABEL(en25qh32b), page_size)
+#define FLASH_DEVICE	  DT_LABEL(DT_NODELABEL(en25qh32b))
+#define CHIP_SIZE_BITS	  DT_PROP(DT_NODELABEL(en25qh32b), size)
+#define ERASE_SECTOR_SIZE DT_PROP(DT_NODELABEL(en25qh32b), erase_sector_size)
 
-#define TEST_REGION_OFFSET 0xFE00
-#define TEST_REGION_SIZE   0x1200
+/* Since we erase the test region, it's offset must be a multiple of the erase-sector-size */
+#define TEST_REGION_OFFSET (ERASE_SECTOR_SIZE * 4)
+/* The size of test region must also be a multiple of the erase-sector-size, for the same reason */
+#define TEST_REGION_SIZE   (ERASE_SECTOR_SIZE * 2)
 
-/* For some reason this has to be declared statically, if declared inside a
- * function, an error is throwed. */
+#define ERASE_BUF_SIZE ERASE_SECTOR_SIZE
+
+/* Define stattically so not a lot of additional stack space is required */
 static uint8_t write_buf[TEST_REGION_SIZE];
 static uint8_t read_buf[TEST_REGION_SIZE];
+static uint8_t erase_check_buf[ERASE_BUF_SIZE];
 
 static void test_get_binding()
 {
@@ -37,9 +41,6 @@ static void test_get_binding()
 	}
 }
 
-#define ERASE_BUF_SIZE PAGE_SIZE /* This should be equal to page size*/
-static uint8_t erase_check_buf[ERASE_BUF_SIZE];
-
 static void test_full_erase_full_read_write()
 {
 	const struct device *flash_dev;
@@ -58,9 +59,9 @@ static void test_full_erase_full_read_write()
 	err = flash_read(flash_dev, TEST_REGION_OFFSET, &data, 1);
 
 	/* Chip size that we get from multiplication is in bytes,
-	 * but CHIP_SIZE that we get from device tree macro is in bits*/
-	zassert_equal((chip_size * 8), CHIP_SIZE, "Chip sizes are not equal");
-	zassert_equal(pages_info.size, PAGE_SIZE, "Page sizes are not equal");
+	 * but CHIP_SIZE_BITS that we get from device tree macro is in bits*/
+	zassert_equal((chip_size * 8), CHIP_SIZE_BITS, "Chip sizes are not equal");
+	zassert_equal(pages_info.size, ERASE_SECTOR_SIZE, "Page sizes are not equal");
 	zassert_equal(err, 0, "Flash read failed");
 
 	printk(" INFO - Starting full flash erase, this will take around 15 "
@@ -88,10 +89,10 @@ static void test_full_erase_full_read_write()
 	}
 	for (i = 0; i < page_count; i++) {
 		err = flash_write(flash_dev, ERASE_BUF_SIZE * i, erase_check_buf, ERASE_BUF_SIZE);
-		zassert_equal(err, 0, "Flash read failed at i: %d", i);
+		zassert_equal(err, 0, "Flash write failed at i: %d", i);
 	}
 
-	/* Erase just in case*/
+	/* Empty buffer just in case*/
 	for (i = 0; i < ERASE_BUF_SIZE; ++i) {
 		erase_check_buf[i] = 0;
 	}
@@ -101,7 +102,7 @@ static void test_full_erase_full_read_write()
 		err = flash_read(flash_dev, ERASE_BUF_SIZE * i, erase_check_buf, ERASE_BUF_SIZE);
 		zassert_equal(err, 0, "Flash read failed at i: %d", i);
 		for (j = 0; j < ERASE_BUF_SIZE; j++) {
-			zassert_equal(erase_check_buf[j], j,
+			zassert_equal(erase_check_buf[j], (uint8_t)j,
 				      "ERROR at erase_check_buf[%d]: expected 0x%02X, got "
 				      "0x%02X\n,\n i is: %d",
 				      j, j, erase_check_buf[j], i);
@@ -127,9 +128,9 @@ static void test_erase_read_write()
 	err = flash_read(flash_dev, TEST_REGION_OFFSET, &data, 1);
 
 	/* Chip size that we get from multiplication is in bytes,
-	 * but CHIP_SIZE that we get form device tree macro is in bits*/
-	zassert_equal((chip_size * 8), CHIP_SIZE, "Chip sizes are not equal");
-	zassert_equal(pages_info.size, PAGE_SIZE, "Page sizes are not equal");
+	 * but CHIP_SIZE_BITS that we get form device tree macro is in bits*/
+	zassert_equal((chip_size * 8), CHIP_SIZE_BITS, "Chip sizes are not equal");
+	zassert_equal(pages_info.size, ERASE_SECTOR_SIZE, "Page sizes are not equal");
 	zassert_equal(err, 0, "Flash read failed");
 
 	++data;
