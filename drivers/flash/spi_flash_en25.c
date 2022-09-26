@@ -54,9 +54,9 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 #define CMD_SECTOR_ERASE     0x20
 /* - Full Block Erase (64KB) Command */
 #define CMD_FULL_BLOCK_ERASE 0xD8
-/* - Full Block Erase (64KB) Command */
+/* - Half Block Erase (32KB) Command */
 #define CMD_HALF_BLOCK_ERASE 0x52
-/* - Page Erase */
+/* - Page Erase (4KB) Command */
 #define CMD_PAGE_ERASE	     0x81
 /* - Enter Deep Power-Down Command */
 #define CMD_ENTER_DPD	     0xB9
@@ -117,7 +117,9 @@ struct spi_flash_en25_config {
 };
 
 static const struct flash_parameters flash_en25_parameters = {
+	/* the smallest number of bytes that can be written at a time*/
 	.write_block_size = 1,
+	/* The value in a byte after an erase operation */
 	.erase_value = 0xff,
 };
 
@@ -501,9 +503,22 @@ static int perform_chip_erase(const struct device *dev)
 	return (err != 0) ? -EIO : 0;
 }
 
+/**
+ * @brief Check if erase can be performed at this offset with this size
+ *
+ * @param[in] entity_size The size of the erasable entity (block/sector of flash)
+ * @param[in] offset The current offset of the erase operation
+ * @param[in] requested_size The number of bytes to erase
+ *
+ * @retval true The requested erase operation can be performed
+ * @retval false The requested erase operation can NOT be performed
+ */
 static bool is_erase_possible(size_t entity_size, off_t offset, size_t requested_size)
 {
-	return (requested_size >= entity_size && (offset & (entity_size - 1)) == 0);
+	/* 1. The size we want to erase must be the same or larger then the entity size
+	 * 2. The offset must be a multiple of the requested entity size
+	 */
+	return (requested_size >= entity_size) && (offset % entity_size == 0);
 }
 
 static int perform_erase_op(const struct device *dev, uint8_t opcode, off_t offset)
@@ -606,6 +621,9 @@ static void spi_flash_en25_pages_layout(const struct device *dev,
 					const struct flash_pages_layout **layout,
 					size_t *layout_size)
 {
+	/* NOTE: The page size specified in the layout here is the smallest erasable sector of the
+	 * chip, as specified in the zephyr flash API.
+	 */
 	*layout = &get_dev_config(dev)->pages_layout;
 	*layout_size = 1;
 }
