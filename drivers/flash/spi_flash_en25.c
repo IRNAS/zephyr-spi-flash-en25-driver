@@ -50,14 +50,12 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 #define CMD_PAGE_PROGRAM     0x02
 /* - Chip erase Command */
 #define CMD_CHIP_ERASE	     0xC7 /* It could also be 0x60 */
-/* - Sector Erase Command */
+/* - Sector Erase (4KB) Command */
 #define CMD_SECTOR_ERASE     0x20
 /* - Full Block Erase (64KB) Command */
 #define CMD_FULL_BLOCK_ERASE 0xD8
 /* - Half Block Erase (32KB) Command */
 #define CMD_HALF_BLOCK_ERASE 0x52
-/* - Page Erase (4KB) Command */
-#define CMD_PAGE_ERASE	     0x81
 /* - Enter Deep Power-Down Command */
 #define CMD_ENTER_DPD	     0xB9
 /* - Exit from Deep Power-Down Command */
