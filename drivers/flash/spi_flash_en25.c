@@ -251,7 +251,7 @@ static int acquire_ext_mutex(const struct device *dev)
 
 	/* Wake SPI peripheral */
 	err = pm_device_action_run(dev_data->spi, PM_DEVICE_ACTION_RESUME);
-	if (err && err != EALREADY) {
+	if (err && err != -EALREADY) {
 		LOG_ERR("pm_device_action_run, err: %d", err);
 	}
 	return 0;
@@ -270,7 +270,7 @@ static int release_ext_mutex(const struct device *dev)
 
 	/* suspend SPI */
 	err = pm_device_action_run(dev_data->spi, PM_DEVICE_ACTION_SUSPEND);
-	if (err && err != EALREADY) {
+	if (err && err != -EALREADY) {
 		LOG_ERR("pm_device_action_run, err: %d", err);
 	}
 
