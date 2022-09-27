@@ -67,6 +67,9 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 #define INST_HAS_HOLD_OR(inst)	DT_INST_NODE_HAS_PROP(inst, hold_gpios) ||
 #define ANY_INST_HAS_HOLD_GPIOS DT_INST_FOREACH_STATUS_OKAY(INST_HAS_HOLD_OR) 0
 
+#define INST_HAS_EXT_MUTEX_OR(inst)  DT_INST_NODE_HAS_PROP(inst, ext_mutex_gpios) ||
+#define ANY_INST_HAS_EXT_MUTEX_GPIOS DT_INST_FOREACH_STATUS_OKAY(INST_HAS_EXT_MUTEX_OR) 0
+
 #define STATUS_REG_WRITE_IN_PROGRESS 0x01
 
 #define STATUS_REG_LSB_PAGE_SIZE_BIT 0x01
@@ -86,6 +89,11 @@ struct spi_flash_en25_data {
 #endif
 };
 
+enum ext_mutex_role {
+	EXT_MUTEX_ROLE_MASTER,
+	EXT_MUTEX_ROLE_SLAVE,
+};
+
 struct spi_flash_en25_config {
 	const char *spi_bus;
 	struct spi_config spi_cfg;
@@ -97,6 +105,11 @@ struct spi_flash_en25_config {
 #endif
 #if ANY_INST_HAS_HOLD_GPIOS
 	const struct gpio_dt_spec *hold;
+#endif
+#if ANY_INST_HAS_EXT_MUTEX_GPIOS
+	const struct gpio_dt_spec *ext_mutex;
+	const struct gpio_dt_spec *spi_clk;
+	enum ext_mutex_role ext_mutex_role;
 #endif
 #if IS_ENABLED(CONFIG_FLASH_PAGE_LAYOUT)
 	struct flash_pages_layout pages_layout;
@@ -132,40 +145,153 @@ static void acquire(const struct device *dev) { k_sem_take(&get_dev_data(dev)->l
 
 static void release(const struct device *dev) { k_sem_give(&get_dev_data(dev)->lock); }
 
-static int acquire_ext_mutex(const struct device *dev)
+#if ANY_INST_HAS_EXT_MUTEX_GPIOS
+
+static int clk_pin_check(const struct gpio_dt_spec *sck_pin)
 {
-#ifdef CONFIG_NRFX_SPIM_EXT_MUTEX
-	int err = 0;
-	// make sure lock is acquired by trying multiple times
-	for (int i = 0; i < 5; i++) {
-		err = spi_ext_mutex_acquire(get_dev_data(dev)->spi);
-		if (err < 0) {
-			spi_ext_mutex_release(get_dev_data(dev)->spi);
-			k_sleep(K_MSEC(10));
-		} else {
+	//  read it for a bit, ...
+	int val_sck = 0;
+	for (int i = 0; i < 10000; i++) // 10 ms total
+	{
+		val_sck = gpio_pin_get_dt(sck_pin);
+		if (val_sck == 1) // only one high means clock is active - spi is in use by master
+		{
+			return -EAGAIN;
+		}
+		k_busy_wait(1); // 1us
+	}
+
+	return 0;
+}
+
+static int ext_mutex_clk_check(const struct device *dev)
+{
+	int err;
+	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
+
+	/* Configure SCK pin to input */
+	err = gpio_pin_configure_dt(dev_config->spi_clk, GPIO_INPUT);
+	if (err) {
+		LOG_ERR("gpio_pin_configure_dt, err: %d", err);
+		return -EIO;
+	}
+
+	/* Read clock a bunch of times and check if it is high at any point */
+	for (int i = 0; i < CONFIG_SPI_FLASH_EN25_EXTERNAL_MUTEX_TIMEOUT; i++) {
+		err = clk_pin_check(dev_config->spi_clk); // this takes 10 ms
+		if (err == 0) {
 			break;
 		}
+		k_busy_wait(10000); // 10 ms
 	}
-	if (err < 0) {
+
+	if (err) {
+		LOG_ERR("SCK pin is high even after waiting, err: %d", err);
+		return -EAGAIN;
+	}
+	return 0;
+}
+
+static int ext_mutex_pin_wait(const struct device *dev)
+{
+	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
+
+	/* Check pin once per ms if it is inactive */
+	for (int i = 0; i < CONFIG_SPI_FLASH_EN25_EXTERNAL_MUTEX_TIMEOUT; i++) {
+		int val = gpio_pin_get_dt(dev_config->ext_mutex);
+		if (!val) {
+			return 0;
+		}
+		k_busy_wait(1000); // 1 ms
+	}
+
+	/* if waiting timed out, we can not lock */
+	return -EAGAIN;
+}
+
+static int acquire_ext_mutex(const struct device *dev)
+{
+	int err = 0;
+	struct spi_flash_en25_data *dev_data = get_dev_data(dev);
+	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
+
+	/* If ext mutex is not configured for this flash device, do nothing */
+	if (!dev_config->ext_mutex) {
+		return 0;
+	}
+
+	/* wait for signal pin to go low */
+	err = ext_mutex_pin_wait(dev);
+	if (err) {
+		LOG_ERR("ext_mutex_pin_wait, err: %d", err);
 		return err;
 	}
-	LOG_DBG("Spi ext mutex acquired");
-#endif
+
+	/* coinfigure signal pin to output active */
+	err = gpio_pin_configure_dt(dev_config->ext_mutex, GPIO_OUTPUT_ACTIVE);
+	if (err) {
+		LOG_ERR("gpio_pin_configure_dt, err: %d", err);
+		return -EIO;
+	}
+
+	/* if in slave role, check if clock is active */
+	if (dev_config->ext_mutex_role == EXT_MUTEX_ROLE_SLAVE) {
+		err = ext_mutex_clk_check(dev);
+		if (err) {
+			LOG_ERR("ext_mutex_clk_check, err: %d", err);
+			return err;
+		}
+	}
+
+	/* Configure CS pin to output */
+	if (dev_config->cs_gpio) {
+		gpio_pin_configure(dev_data->spi_cs.gpio.port, dev_data->spi_cs.gpio.pin,
+				   GPIO_OUTPUT | dev_data->spi_cs.gpio.dt_flags);
+	}
+
+	/* Wake SPI peripheral */
+	err = pm_device_action_run(dev_data->spi, PM_DEVICE_ACTION_RESUME);
+	if (err && err != EALREADY) {
+		LOG_ERR("pm_device_action_run, err: %d", err);
+	}
 	return 0;
 }
 
 static int release_ext_mutex(const struct device *dev)
 {
-#ifdef CONFIG_NRFX_SPIM_EXT_MUTEX
-	int err = spi_ext_mutex_release(get_dev_data(dev)->spi);
-	if (err != 0) {
-		LOG_ERR("spi_ext_mutex_release, err: %d", err);
-		return err;
+	int err = 0;
+	struct spi_flash_en25_data *dev_data = get_dev_data(dev);
+	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
+
+	/* If ext mutex is not configured for this flash device, do nothing */
+	if (!dev_config->ext_mutex) {
+		return 0;
 	}
-	LOG_DBG("Spi ext mutex released");
-#endif
+
+	/* suspend SPI */
+	err = pm_device_action_run(dev_data->spi, PM_DEVICE_ACTION_SUSPEND);
+	if (err && err != EALREADY) {
+		LOG_ERR("pm_device_action_run, err: %d", err);
+	}
+
+	/* Configure CS pin to disconnected */
+	if (dev_config->cs_gpio) {
+		gpio_pin_configure(dev_data->spi_cs.gpio.port, dev_data->spi_cs.gpio.pin,
+				   GPIO_DISCONNECTED);
+	}
+
+	/* Configure signal pin to input */
+	err = gpio_pin_configure_dt(dev_config->ext_mutex, GPIO_INPUT);
+	if (err) {
+		LOG_ERR("gpio_pin_configure_dt, err: %d", err);
+		return -EIO;
+	}
 	return 0;
 }
+#else
+static int acquire_ext_mutex(const struct device *dev) { return 0; }
+static int release_ext_mutex(const struct device *dev) { return 0; }
+#endif /* ANY_INST_HAS_EXT_MUTEX_GPIOS */
 
 static int check_jedec_id(const struct device *dev)
 {
@@ -673,6 +799,15 @@ static int spi_flash_en25_init(const struct device *dev)
 		dev_data->spi_cs.delay = 0;
 	}
 
+#if ANY_INST_HAS_EXT_MUTEX_GPIOS
+	if (dev_config->ext_mutex) {
+		if (gpio_pin_configure_dt(dev_config->ext_mutex, GPIO_INPUT)) {
+			LOG_ERR("Couldn't configure ext_mutex pin");
+			return -EIO;
+		}
+	}
+#endif
+
 	int m_err = acquire_ext_mutex(dev);
 	if (m_err) {
 		return m_err;
@@ -791,6 +926,20 @@ static const struct flash_driver_api spi_flash_en25_api = {
 		   (static const struct gpio_dt_spec hold_##idx =                                  \
 			    GPIO_DT_SPEC_GET(DT_DRV_INST(idx), hold_gpios);))
 
+#define INST_HAS_EXT_MUTEX_GPIO(idx) DT_NODE_HAS_PROP(DT_DRV_INST(idx), ext_mutex_gpios)
+
+#define INST_EXT_MUTEX_GPIO_SPEC(idx)                                                              \
+	IF_ENABLED(INST_HAS_EXT_MUTEX_GPIO(idx),                                                   \
+		   (static const struct gpio_dt_spec ext_mutex_##idx =                             \
+			    GPIO_DT_SPEC_GET(DT_DRV_INST(idx), ext_mutex_gpios);))
+
+#define INST_HAS_SPI_CLK_GPIO(idx) DT_NODE_HAS_PROP(DT_DRV_INST(idx), spi_clk_gpios)
+
+#define INST_SPI_CLK_GPIO_SPEC(idx)                                                                \
+	IF_ENABLED(INST_HAS_SPI_CLK_GPIO(idx),                                                     \
+		   (static const struct gpio_dt_spec spi_clk_##idx =                               \
+			    GPIO_DT_SPEC_GET(DT_DRV_INST(idx), spi_clk_gpios);))
+
 #define SPI_FLASH_EN25_INST(idx)                                                                   \
 	enum {                                                                                     \
 		INST_##idx##_BYTES = (DT_INST_PROP(idx, size) / 8),                                \
@@ -801,6 +950,8 @@ static const struct flash_driver_api spi_flash_en25_api = {
 		IF_ENABLED(CONFIG_PM_DEVICE, (.pm_state = PM_DEVICE_STATE_ACTIVE))};               \
 	INST_WP_GPIO_SPEC(idx)                                                                     \
 	INST_HOLD_GPIO_SPEC(idx)                                                                   \
+	INST_EXT_MUTEX_GPIO_SPEC(idx)                                                              \
+	INST_SPI_CLK_GPIO_SPEC(idx)                                                                \
 	static const struct spi_flash_en25_config inst_##idx##_config = {                          \
 		.spi_bus = DT_INST_BUS_LABEL(idx),                                                 \
 		.spi_cfg =                                                                         \
@@ -834,7 +985,11 @@ static const struct flash_driver_api spi_flash_en25_api = {
 		.t_exit_dpd = ceiling_fraction(DT_INST_PROP(idx, exit_dpd_delay), NSEC_PER_USEC),  \
 		.use_udpd = DT_INST_PROP(idx, use_udpd),                                           \
 		.jedec_id = DT_INST_PROP(idx, jedec_id),                                           \
-	};                                                                                         \
+		IF_ENABLED(INST_HAS_EXT_MUTEX_GPIO(idx), (.ext_mutex = &ext_mutex_##idx, ))        \
+			IF_ENABLED(INST_HAS_SPI_CLK_GPIO(idx), (.spi_clk = &spi_clk_##idx, ))      \
+				IF_ENABLED(INST_HAS_EXT_MUTEX_GPIO(idx),                           \
+					   (.ext_mutex_role =                                      \
+						    DT_INST_ENUM_IDX(idx, ext_mutex_role), ))};    \
 	IF_ENABLED(CONFIG_FLASH_PAGE_LAYOUT,                                                       \
 		   (BUILD_ASSERT((INST_##idx##_PAGES * DT_INST_PROP(idx, erase_sector_size)) ==    \
 					 INST_##idx##_BYTES,                                       \

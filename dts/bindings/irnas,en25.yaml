@@ -84,3 +84,30 @@ properties:
     type: phandle-array
     required: false
     description: HOLDn pin
+
+  ext-mutex-gpios:
+    type: phandle-array
+    required: false
+    description: |
+      Enable external mutex functionality.
+      Set this if multiple MCUs will interface with the same en25 flash peripheral.
+      The pin defined here must be connected between both MCUs and will be used to signal
+      when flash is busy.
+
+  ext-mutex-role:
+    type: string
+    required: false
+    enum:
+      - "master"
+      - "slave"
+    description: |
+      Mutex role for MCU. One should be configured to "master" and the other to "slave".
+      The "slave" role performs an additional check of the spi clock, and is thus a bit slower.
+      Use "master" on the MCU that is expected to use the flash more often.
+
+  spi-clk-gpios:
+    type: phandle-array
+    required: false
+    description: |
+      Required for the external mutex slave role. Must be the same pin that is used for the
+      parent SPI clock.
