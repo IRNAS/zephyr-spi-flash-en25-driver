@@ -7,6 +7,7 @@ This drive is compatible with the following flash chips:
 - `EN25QH32B` with JEDEC id `[1c 70 16]`
 - `IS25WP032D` with JEDEC id `[9D 70 16]`
 - `W25Q32JVSSIQ` with JEDEC id `[EF 40 16]`
+- `AT25SL321` with JEDEC id `[1F 42 16]`
 
 ## Setup
 
