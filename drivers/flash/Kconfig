@@ -41,4 +41,12 @@ config SPI_FLASH_EN25_JEDEC_CHECK_AT_INIT
 	  fail if the ID does not match.
 	  If false, the check is skipped.
 
+
+config SPI_FLASH_EN25_EXTERNAL_MUTEX_TIMEOUT
+	int "Max duration to wait for external mutex, in ms"
+	default 5000
+	help
+	  This is only used if the ext-mutex-gpio DTS property is set.
+
+
 endif # SPI_FLASH_EN25

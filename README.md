@@ -70,6 +70,34 @@ If you already have a NCS setup you can follow these steps:
 
 ```
 
+## External mutex
+
+This driver can be used on multiple MCUs to use the same SPI flash peripheral. To achieve this, a GPIO line must be shared between the MCUs,
+the flash chip must be the only peripheral on this SPI bus and both MCUs must be using this driver to communicate with the external flash.
+To enable this feature, add `ext-mutex-gpios`, `ext-mutex-role` and `spi-clk-gpios` to the DTS flash definition.
+
+For two MCUs, set one `ext-mutex-role` to `master` and one to `slave`. For more than 2 MCUs, set one to `master` and all others to `slave`.
+
+For example:
+
+```dts
+
+&spi0 {
+   // ...
+
+    en25qh32b: en25qh32b@0 {
+        // ...
+
+        ext-mutex-gpios =  <&gpio0 24 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+        ext-mutex-role = "slave";
+        spi-clk-gpios = <&gpio0 28 0>;  // must be same as the pinctrl entry of the enclosing spi peripheral
+    };
+};
+
+```
+The setting `SPI_FLASH_EN25_EXTERNAL_MUTEX_TIMEOUT` can also be configured to specify the amount of time
+a MCU is willing to wait for the SPI lock to be released.
+
 ## Tests
 
 1. Navigate to `./tests/flash_read_write`
