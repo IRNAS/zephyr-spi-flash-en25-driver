@@ -7,6 +7,12 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 
 ## [Unreleased]
 
+## [3.1.0] - 2023-01-25
+
+### Added
+
+-   SPI external mutex functionality.
+
 ## [3.0.0] - 2022-09-26
 
 ### Changed
@@ -76,7 +82,9 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 
 -   Above changes related to jedec check id should be removed when the lr1110 driver is rewritten with zephyr API or when a way to move flash driver init after the lr1110 driver init is found.
 
-[Unreleased]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v3.1.0...HEAD
+
+[3.1.0]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v3.0.0...v3.1.0
 
 [3.0.0]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare//v2.1.0...v3.0.0
 
