@@ -7,6 +7,10 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 
 ## [Unreleased]
 
+### Added
+
+- SPI external mutex functionality.
+
 ## [3.0.0] - 2022-09-26
 
 ### Changed
