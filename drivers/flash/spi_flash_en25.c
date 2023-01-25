@@ -23,11 +23,11 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 /* - Main Memory Byte/Page Program through Buffer 1 without Built-In Erase */
 /* - Ultra-Deep Power-Down */
 #define CMD_ENTER_UDPD 0x79
-/* - Buffer and Page Size Configuration, "Power of 2" binary page size */
-#define CMD_BINARY_PAGE_SIZE                                                                       \
-	{                                                                                          \
-		0x3D, 0x2A, 0x80, 0xA6                                                             \
-	} // should not be needed
+/* - Buffer and Page Size Configuration, "Power of 2" binary page size - should not be needed */
+// #define CMD_BINARY_PAGE_SIZE                                                                    \
+// 	{                                                                                          \
+// 		0x3D, 0x2A, 0x80, 0xA6                                                             \
+// 	}
 
 /* ------------------------------*/
 /* New commmads*/
@@ -149,16 +149,15 @@ static void release(const struct device *dev) { k_sem_give(&get_dev_data(dev)->l
 
 static int clk_pin_check(const struct gpio_dt_spec *sck_pin)
 {
-	//  read it for a bit, ...
 	int val_sck = 0;
-	for (int i = 0; i < 10000; i++) // 10 ms total
-	{
+	for (int i = 0; i < 10000; i++) {
 		val_sck = gpio_pin_get_dt(sck_pin);
-		if (val_sck == 1) // only one high means clock is active - spi is in use by master
-		{
+		/* only one high means clock is active - spi is in use by master */
+		if (val_sck == 1) {
 			return -EAGAIN;
 		}
-		k_busy_wait(1); // 1us
+		/* Wait 1 us without sleeping this thread */
+		k_busy_wait(1);
 	}
 
 	return 0;
@@ -177,12 +176,14 @@ static int ext_mutex_clk_check(const struct device *dev)
 	}
 
 	/* Read clock a bunch of times and check if it is high at any point */
-	for (int i = 0; i < CONFIG_SPI_FLASH_EN25_EXTERNAL_MUTEX_TIMEOUT; i++) {
-		err = clk_pin_check(dev_config->spi_clk); // this takes 10 ms
+	int interations = CONFIG_SPI_FLASH_EN25_EXTERNAL_MUTEX_TIMEOUT / 20;
+	for (int i = 0; i < interations; i++) {
+		/* clk_pin_check takes cca 10 ms */
+		err = clk_pin_check(dev_config->spi_clk);
 		if (err == 0) {
 			break;
 		}
-		k_busy_wait(10000); // 10 ms
+		k_sleep(K_MSEC(10));
 	}
 
 	if (err) {
@@ -202,7 +203,8 @@ static int ext_mutex_pin_wait(const struct device *dev)
 		if (!val) {
 			return 0;
 		}
-		k_busy_wait(1000); // 1 ms
+		/* Wait 1 ms without sleeping this thread */
+		k_busy_wait(1000);
 	}
 
 	/* if waiting timed out, we can not lock */
@@ -381,7 +383,7 @@ static int wait_until_ready(const struct device *dev)
 		k_msleep(1);
 	}
 
-	// we are out of the loop so we have timed out
+	/* we are out of the loop so we have timed out */
 	return -ETIMEDOUT;
 }
 
