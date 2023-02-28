@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <drivers/flash.h>
-#include <drivers/spi.h>
-#include <logging/log.h>
-#include <pm/device.h>
-#include <sys/byteorder.h>
-#include <zephyr.h>
+#include <zephyr/drivers/flash.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/kernel.h>
 
 #ifdef CONFIG_NRFX_SPIM_EXT_MUTEX
 #include <spi_external_mutex.h>
