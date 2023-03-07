@@ -6,10 +6,10 @@
 
 #include <zephyr/drivers/flash.h>
 #include <zephyr/drivers/spi.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/pm/device.h>
 #include <zephyr/sys/byteorder.h>
-#include <zephyr/kernel.h>
 
 #ifdef CONFIG_NRFX_SPIM_EXT_MUTEX
 #include <spi_external_mutex.h>
@@ -205,7 +205,6 @@ static int ext_mutex_pin_wait(const struct device *dev)
 static int acquire_ext_mutex(const struct device *dev)
 {
 	int err = 0;
-	struct spi_flash_en25_data *dev_data = get_dev_data(dev);
 	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
 
 	/* If ext mutex is not configured for this flash device, do nothing */
@@ -237,13 +236,12 @@ static int acquire_ext_mutex(const struct device *dev)
 	}
 
 	/* Configure CS pin to output */
-	if (dev_config->cs_gpio) {
-		gpio_pin_configure(dev_data->spi_cs.gpio.port, dev_data->spi_cs.gpio.pin,
-				   GPIO_OUTPUT | dev_data->spi_cs.gpio.dt_flags);
+	if (dev_config->bus.config.cs->gpio.port) {
+		gpio_pin_configure_dt(&dev_config->bus.config.cs->gpio, GPIO_OUTPUT);
 	}
 
 	/* Wake SPI peripheral */
-	err = pm_device_action_run(dev_data->spi, PM_DEVICE_ACTION_RESUME);
+	err = pm_device_action_run(dev_config->bus.bus, PM_DEVICE_ACTION_RESUME);
 	if (err && err != -EALREADY) {
 		LOG_ERR("pm_device_action_run, err: %d", err);
 	}
@@ -253,7 +251,6 @@ static int acquire_ext_mutex(const struct device *dev)
 static int release_ext_mutex(const struct device *dev)
 {
 	int err = 0;
-	struct spi_flash_en25_data *dev_data = get_dev_data(dev);
 	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
 
 	/* If ext mutex is not configured for this flash device, do nothing */
@@ -262,15 +259,14 @@ static int release_ext_mutex(const struct device *dev)
 	}
 
 	/* suspend SPI */
-	err = pm_device_action_run(dev_data->spi, PM_DEVICE_ACTION_SUSPEND);
+	err = pm_device_action_run(dev_config->bus.bus, PM_DEVICE_ACTION_SUSPEND);
 	if (err && err != -EALREADY) {
 		LOG_ERR("pm_device_action_run, err: %d", err);
 	}
 
 	/* Configure CS pin to disconnected */
-	if (dev_config->cs_gpio) {
-		gpio_pin_configure(dev_data->spi_cs.gpio.port, dev_data->spi_cs.gpio.pin,
-				   GPIO_DISCONNECTED);
+	if (dev_config->bus.config.cs->gpio.port) {
+		gpio_pin_configure_dt(&dev_config->bus.config.cs->gpio, GPIO_DISCONNECTED);
 	}
 
 	/* Configure signal pin to input */
@@ -760,7 +756,6 @@ static int spi_flash_en25_init(const struct device *dev)
 		return -ENODEV;
 	}
 
-	
 	/* GPIO configure */
 
 #if ANY_INST_HAS_WP_GPIOS
@@ -937,11 +932,12 @@ static const struct flash_driver_api spi_flash_en25_api = {
 	INST_EXT_MUTEX_GPIO_SPEC(idx)                                                              \
 	INST_SPI_CLK_GPIO_SPEC(idx)                                                                \
 	static const struct spi_flash_en25_config inst_##idx##_config = {                          \
-		.bus = SPI_DT_SPEC_INST_GET(				     \
-			idx, SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB |	     \
-			SPI_WORD_SET(8) | SPI_LINES_SINGLE, 0),		     \
-			IF_ENABLED(INST_HAS_WP_GPIO(idx), (.wp = &wp_##idx, )) IF_ENABLED(         \
-				INST_HAS_HOLD_GPIO(idx), (.hold = &hold_##idx, ))                  \
+		.bus = SPI_DT_SPEC_INST_GET(idx,                                                   \
+					    SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB |                \
+						    SPI_WORD_SET(8) | SPI_LINES_SINGLE,            \
+					    0),                                                    \
+		IF_ENABLED(INST_HAS_WP_GPIO(idx), (.wp = &wp_##idx, ))                             \
+			IF_ENABLED(INST_HAS_HOLD_GPIO(idx), (.hold = &hold_##idx, ))               \
 				IF_ENABLED(CONFIG_FLASH_PAGE_LAYOUT,                               \
 					   (.pages_layout =                                        \
 						    {                                              \
