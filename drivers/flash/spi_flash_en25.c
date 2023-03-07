@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <drivers/flash.h>
-#include <drivers/spi.h>
-#include <logging/log.h>
-#include <pm/device.h>
-#include <sys/byteorder.h>
-#include <zephyr.h>
+#include <zephyr/drivers/flash.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/sys/byteorder.h>
 
 #ifdef CONFIG_NRFX_SPIM_EXT_MUTEX
 #include <spi_external_mutex.h>
@@ -24,10 +24,7 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 /* - Ultra-Deep Power-Down */
 #define CMD_ENTER_UDPD 0x79
 /* - Buffer and Page Size Configuration, "Power of 2" binary page size - should not be needed */
-// #define CMD_BINARY_PAGE_SIZE                                                                    \
-// 	{                                                                                          \
-// 		0x3D, 0x2A, 0x80, 0xA6                                                             \
-// 	}
+// #define CMD_BINARY_PAGE_SIZE {0x3D, 0x2A, 0x80, 0xA6 }
 
 /* ------------------------------*/
 /* New commmads*/
@@ -81,8 +78,6 @@ LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 	}
 
 struct spi_flash_en25_data {
-	const struct device *spi;
-	struct spi_cs_control spi_cs;
 	struct k_sem lock;
 #if IS_ENABLED(CONFIG_PM_DEVICE)
 	uint32_t pm_state;
@@ -95,11 +90,7 @@ enum ext_mutex_role {
 };
 
 struct spi_flash_en25_config {
-	const char *spi_bus;
-	struct spi_config spi_cfg;
-	const char *cs_gpio;
-	gpio_pin_t cs_pin;
-	gpio_dt_flags_t cs_dt_flags;
+	struct spi_dt_spec bus;
 #if ANY_INST_HAS_WP_GPIOS
 	const struct gpio_dt_spec *wp;
 #endif
@@ -214,7 +205,6 @@ static int ext_mutex_pin_wait(const struct device *dev)
 static int acquire_ext_mutex(const struct device *dev)
 {
 	int err = 0;
-	struct spi_flash_en25_data *dev_data = get_dev_data(dev);
 	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
 
 	/* If ext mutex is not configured for this flash device, do nothing */
@@ -246,13 +236,12 @@ static int acquire_ext_mutex(const struct device *dev)
 	}
 
 	/* Configure CS pin to output */
-	if (dev_config->cs_gpio) {
-		gpio_pin_configure(dev_data->spi_cs.gpio.port, dev_data->spi_cs.gpio.pin,
-				   GPIO_OUTPUT | dev_data->spi_cs.gpio.dt_flags);
+	if (dev_config->bus.config.cs->gpio.port) {
+		gpio_pin_configure_dt(&dev_config->bus.config.cs->gpio, GPIO_OUTPUT);
 	}
 
 	/* Wake SPI peripheral */
-	err = pm_device_action_run(dev_data->spi, PM_DEVICE_ACTION_RESUME);
+	err = pm_device_action_run(dev_config->bus.bus, PM_DEVICE_ACTION_RESUME);
 	if (err && err != -EALREADY) {
 		LOG_ERR("pm_device_action_run, err: %d", err);
 	}
@@ -262,7 +251,6 @@ static int acquire_ext_mutex(const struct device *dev)
 static int release_ext_mutex(const struct device *dev)
 {
 	int err = 0;
-	struct spi_flash_en25_data *dev_data = get_dev_data(dev);
 	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
 
 	/* If ext mutex is not configured for this flash device, do nothing */
@@ -271,15 +259,14 @@ static int release_ext_mutex(const struct device *dev)
 	}
 
 	/* suspend SPI */
-	err = pm_device_action_run(dev_data->spi, PM_DEVICE_ACTION_SUSPEND);
+	err = pm_device_action_run(dev_config->bus.bus, PM_DEVICE_ACTION_SUSPEND);
 	if (err && err != -EALREADY) {
 		LOG_ERR("pm_device_action_run, err: %d", err);
 	}
 
 	/* Configure CS pin to disconnected */
-	if (dev_config->cs_gpio) {
-		gpio_pin_configure(dev_data->spi_cs.gpio.port, dev_data->spi_cs.gpio.pin,
-				   GPIO_DISCONNECTED);
+	if (dev_config->bus.config.cs->gpio.port) {
+		gpio_pin_configure_dt(&dev_config->bus.config.cs->gpio, GPIO_DISCONNECTED);
 	}
 
 	/* Configure signal pin to input */
@@ -316,7 +303,7 @@ static int check_jedec_id(const struct device *dev)
 	DEF_BUF_SET(tx_buf_set, tx_buf);
 	DEF_BUF_SET(rx_buf_set, rx_buf);
 
-	err = spi_transceive(get_dev_data(dev)->spi, &cfg->spi_cfg, &tx_buf_set, &rx_buf_set);
+	err = spi_transceive_dt(&cfg->bus, &tx_buf_set, &rx_buf_set);
 	if (err != 0) {
 		LOG_ERR("SPI transaction failed with code: %d/%u", err, __LINE__);
 		return -EIO;
@@ -338,6 +325,7 @@ static int check_jedec_id(const struct device *dev)
  */
 static int read_status_register(const struct device *dev, uint8_t *status)
 {
+	const struct spi_flash_en25_config *cfg = get_dev_config(dev);
 	int err;
 	const uint8_t opcode = CMD_READ_STATUS;
 	const uint8_t empty = 0;
@@ -359,8 +347,7 @@ static int read_status_register(const struct device *dev, uint8_t *status)
 	DEF_BUF_SET(tx_buf_set, tx_buf);
 	DEF_BUF_SET(rx_buf_set, rx_buf);
 
-	err = spi_transceive(get_dev_data(dev)->spi, &get_dev_config(dev)->spi_cfg, &tx_buf_set,
-			     &rx_buf_set);
+	err = spi_transceive_dt(&cfg->bus, &tx_buf_set, &rx_buf_set);
 	if (err != 0) {
 		LOG_ERR("SPI transaction failed with code: %d/%u", err, __LINE__);
 		return -EIO;
@@ -389,6 +376,7 @@ static int wait_until_ready(const struct device *dev)
 
 static int send_cmd_op(const struct device *dev, uint8_t opcode, uint32_t delay)
 {
+	const struct spi_flash_en25_config *cfg = get_dev_config(dev);
 	int err = 0;
 	const struct spi_buf tx_buf[] = {{
 		.buf = (void *)&opcode,
@@ -396,7 +384,7 @@ static int send_cmd_op(const struct device *dev, uint8_t opcode, uint32_t delay)
 	}};
 	DEF_BUF_SET(tx_buf_set, tx_buf);
 
-	err = spi_write(get_dev_data(dev)->spi, &get_dev_config(dev)->spi_cfg, &tx_buf_set);
+	err = spi_write_dt(&cfg->bus, &tx_buf_set);
 
 	if (err != 0) {
 		LOG_ERR("SPI transaction failed with code: %d/%u", err, __LINE__);
@@ -473,7 +461,7 @@ static int spi_flash_en25_read(const struct device *dev, off_t offset, void *dat
 	}
 
 	acquire(dev);
-	err = spi_transceive(get_dev_data(dev)->spi, &cfg->spi_cfg, &tx_buf_set, &rx_buf_set);
+	err = spi_transceive_dt(&cfg->bus, &tx_buf_set, &rx_buf_set);
 	release(dev);
 
 	m_err = release_ext_mutex(dev);
@@ -490,6 +478,7 @@ static int spi_flash_en25_read(const struct device *dev, off_t offset, void *dat
 
 static int perform_write(const struct device *dev, off_t offset, const void *data, size_t len)
 {
+	const struct spi_flash_en25_config *cfg = get_dev_config(dev);
 	int err;
 	err = set_write_enable(dev);
 	if (err != 0) {
@@ -512,7 +501,7 @@ static int perform_write(const struct device *dev, off_t offset, const void *dat
 					 }};
 	DEF_BUF_SET(tx_buf_set, tx_buf);
 
-	err = spi_write(get_dev_data(dev)->spi, &get_dev_config(dev)->spi_cfg, &tx_buf_set);
+	err = spi_write_dt(&cfg->bus, &tx_buf_set);
 	if (err != 0) {
 		LOG_ERR("SPI transaction failed with code: %d/%u", err, __LINE__);
 	} else {
@@ -606,6 +595,7 @@ static int spi_flash_en25_write(const struct device *dev, off_t offset, const vo
 
 static int perform_chip_erase(const struct device *dev)
 {
+	const struct spi_flash_en25_config *cfg = get_dev_config(dev);
 	int err;
 	err = set_write_enable(dev);
 	if (err != 0) {
@@ -619,7 +609,7 @@ static int perform_chip_erase(const struct device *dev)
 	}};
 	DEF_BUF_SET(tx_buf_set, tx_buf);
 
-	err = spi_write(get_dev_data(dev)->spi, &get_dev_config(dev)->spi_cfg, &tx_buf_set);
+	err = spi_write_dt(&cfg->bus, &tx_buf_set);
 	if (err != 0) {
 		LOG_ERR("SPI transaction failed with code: %d/%u", err, __LINE__);
 	} else {
@@ -649,6 +639,7 @@ static bool is_erase_possible(size_t entity_size, off_t offset, size_t requested
 
 static int perform_erase_op(const struct device *dev, uint8_t opcode, off_t offset)
 {
+	const struct spi_flash_en25_config *cfg = get_dev_config(dev);
 	int err;
 	err = set_write_enable(dev);
 	if (err != 0) {
@@ -667,7 +658,7 @@ static int perform_erase_op(const struct device *dev, uint8_t opcode, off_t offs
 	}};
 	DEF_BUF_SET(tx_buf_set, tx_buf);
 
-	err = spi_write(get_dev_data(dev)->spi, &get_dev_config(dev)->spi_cfg, &tx_buf_set);
+	err = spi_write_dt(&cfg->bus, &tx_buf_set);
 	if (err != 0) {
 		LOG_ERR("SPI transaction failed with code: %d/%u", err, __LINE__);
 	} else {
@@ -757,13 +748,11 @@ static void spi_flash_en25_pages_layout(const struct device *dev,
 
 static int spi_flash_en25_init(const struct device *dev)
 {
-	struct spi_flash_en25_data *dev_data = get_dev_data(dev);
 	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
 	int err;
 
-	dev_data->spi = device_get_binding(dev_config->spi_bus);
-	if (!dev_data->spi) {
-		LOG_ERR("Cannot find %s", dev_config->spi_bus);
+	if (!spi_is_ready(&dev_config->bus)) {
+		LOG_ERR("SPI bus %s not ready", dev_config->bus.bus->name);
 		return -ENODEV;
 	}
 
@@ -788,18 +777,6 @@ static int spi_flash_en25_init(const struct device *dev)
 		gpio_pin_set(dev_config->hold->port, dev_config->hold->pin, 1);
 	}
 #endif
-
-	if (dev_config->cs_gpio) {
-		dev_data->spi_cs.gpio.port = device_get_binding(dev_config->cs_gpio);
-		if (!dev_data->spi_cs.gpio.port) {
-			LOG_ERR("Cannot find %s", dev_config->cs_gpio);
-			return -ENODEV;
-		}
-
-		dev_data->spi_cs.gpio.pin = dev_config->cs_pin;
-		dev_data->spi_cs.gpio.dt_flags = dev_config->cs_dt_flags;
-		dev_data->spi_cs.delay = 0;
-	}
 
 #if ANY_INST_HAS_EXT_MUTEX_GPIOS
 	if (dev_config->ext_mutex) {
@@ -955,21 +932,12 @@ static const struct flash_driver_api spi_flash_en25_api = {
 	INST_EXT_MUTEX_GPIO_SPEC(idx)                                                              \
 	INST_SPI_CLK_GPIO_SPEC(idx)                                                                \
 	static const struct spi_flash_en25_config inst_##idx##_config = {                          \
-		.spi_bus = DT_INST_BUS_LABEL(idx),                                                 \
-		.spi_cfg =                                                                         \
-			{                                                                          \
-				.frequency = DT_INST_PROP(idx, spi_max_frequency),                 \
-				.operation = SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB |               \
-					     SPI_WORD_SET(8) | SPI_LINES_SINGLE,                   \
-				.slave = DT_INST_REG_ADDR(idx),                                    \
-				.cs = &inst_##idx##_data.spi_cs,                                   \
-			},                                                                         \
-		IF_ENABLED(DT_INST_SPI_DEV_HAS_CS_GPIOS(idx),                                      \
-			   (.cs_gpio = DT_INST_SPI_DEV_CS_GPIOS_LABEL(idx),                        \
-			    .cs_pin = DT_INST_SPI_DEV_CS_GPIOS_PIN(idx),                           \
-			    .cs_dt_flags = DT_INST_SPI_DEV_CS_GPIOS_FLAGS(idx), ))                 \
-			IF_ENABLED(INST_HAS_WP_GPIO(idx), (.wp = &wp_##idx, )) IF_ENABLED(         \
-				INST_HAS_HOLD_GPIO(idx), (.hold = &hold_##idx, ))                  \
+		.bus = SPI_DT_SPEC_INST_GET(idx,                                                   \
+					    SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB |                \
+						    SPI_WORD_SET(8) | SPI_LINES_SINGLE,            \
+					    0),                                                    \
+		IF_ENABLED(INST_HAS_WP_GPIO(idx), (.wp = &wp_##idx, ))                             \
+			IF_ENABLED(INST_HAS_HOLD_GPIO(idx), (.hold = &hold_##idx, ))               \
 				IF_ENABLED(CONFIG_FLASH_PAGE_LAYOUT,                               \
 					   (.pages_layout =                                        \
 						    {                                              \
