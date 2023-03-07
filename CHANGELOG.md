@@ -7,6 +7,10 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 
 ## [Unreleased]
 
+### Changed
+
+- Update driver for NCS 2.2.
+
 ## [3.1.0] - 2023-01-25
 
 ### Added
