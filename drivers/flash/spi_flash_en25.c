@@ -834,6 +834,10 @@ static int spi_flash_en25_init(const struct device *dev)
 		return m_err;
 	}
 
+	/* Read one byte - this puts flash into a low power state */
+	uint8_t _r[4];
+	err = spi_flash_en25_read(dev, 0, _r, sizeof(_r));
+
 	return err;
 }
 
