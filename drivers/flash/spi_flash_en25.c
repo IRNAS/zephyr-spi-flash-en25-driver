@@ -799,6 +799,7 @@ static int spi_flash_en25_init(const struct device *dev)
 	err = perform_reset_sequence(dev);
 	if (err != 0) {
 		LOG_ERR("perform_reset_sequence, err: %d", err);
+		release(dev);
 		release_ext_mutex(dev);
 		return err;
 	}
@@ -815,6 +816,8 @@ static int spi_flash_en25_init(const struct device *dev)
 #ifdef CONFIG_SPI_FLASH_EN25_JEDEC_CHECK_AT_INIT
 	err = check_jedec_id(dev);
 	if (err != 0) {
+		release(dev);
+		release_ext_mutex(dev);
 		return err;
 	}
 #else
