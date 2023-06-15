@@ -266,7 +266,7 @@ static int release_ext_mutex(const struct device *dev)
 
 	/* Configure CS pin to disconnected */
 	if (dev_config->bus.config.cs->gpio.port) {
-		gpio_pin_configure_dt(&dev_config->bus.config.cs->gpio, GPIO_DISCONNECTED);
+		gpio_pin_configure_dt(&dev_config->bus.config.cs->gpio, GPIO_INPUT | GPIO_PULL_UP);
 	}
 
 	/* Configure signal pin to input */
