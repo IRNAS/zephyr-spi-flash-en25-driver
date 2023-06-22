@@ -14,6 +14,7 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 ### Fixed
 
 - Fix mutex handling during driver initialization.
+- Configure CS pin to disconnected pullup on mutex release
 
 ## [3.2.0] - 2023-03-07
 
