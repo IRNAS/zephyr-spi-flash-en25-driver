@@ -7,14 +7,16 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 
 ## [Unreleased]
 
+## [3.3.0] - 2023-06-22
+
 ### Added
 
-- Read one byte after init to enable low power operation.
+-   Read one byte after init to enable low power operation.
 
 ### Fixed
 
-- Fix mutex handling during driver initialization.
-- Configure CS pin to disconnected pullup on mutex release
+-   Fix mutex handling during driver initialization.
+-   Configure CS pin to disconnected pullup on mutex release
 
 ## [3.2.0] - 2023-03-07
 
@@ -97,7 +99,9 @@ and this project adheres to [IRNAS's naming guidelines](https://github.com/IRNAS
 
 -   Above changes related to jedec check id should be removed when the lr1110 driver is rewritten with zephyr API or when a way to move flash driver init after the lr1110 driver init is found.
 
-[Unreleased]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v3.3.0...HEAD
+
+[3.3.0]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v3.2.0...v3.3.0
 
 [3.2.0]: https://github.com/IRNAS/zephyr-spi-flash-en25-driver/compare/v3.1.0...v3.2.0
 
