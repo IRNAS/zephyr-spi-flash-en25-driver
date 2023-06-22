@@ -266,7 +266,7 @@ static int release_ext_mutex(const struct device *dev)
 
 	/* Configure CS pin to disconnected */
 	if (dev_config->bus.config.cs->gpio.port) {
-		gpio_pin_configure_dt(&dev_config->bus.config.cs->gpio, GPIO_DISCONNECTED);
+		gpio_pin_configure_dt(&dev_config->bus.config.cs->gpio, GPIO_INPUT | GPIO_PULL_UP);
 	}
 
 	/* Configure signal pin to input */
@@ -799,6 +799,7 @@ static int spi_flash_en25_init(const struct device *dev)
 	err = perform_reset_sequence(dev);
 	if (err != 0) {
 		LOG_ERR("perform_reset_sequence, err: %d", err);
+		release(dev);
 		release_ext_mutex(dev);
 		return err;
 	}
@@ -815,6 +816,8 @@ static int spi_flash_en25_init(const struct device *dev)
 #ifdef CONFIG_SPI_FLASH_EN25_JEDEC_CHECK_AT_INIT
 	err = check_jedec_id(dev);
 	if (err != 0) {
+		release(dev);
+		release_ext_mutex(dev);
 		return err;
 	}
 #else
@@ -830,6 +833,10 @@ static int spi_flash_en25_init(const struct device *dev)
 	if (m_err) {
 		return m_err;
 	}
+
+	/* Read one byte - this puts flash into a low power state */
+	uint8_t _r[4];
+	err = spi_flash_en25_read(dev, 0, _r, sizeof(_r));
 
 	return err;
 }
