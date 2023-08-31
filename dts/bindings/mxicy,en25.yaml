@@ -1,9 +1,10 @@
 # Copyright (c) 2020 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
-description: ESMT EN25 (or compatible) SPI flash
+description:
+  ESMT EN25 (or compatible) SPI flash made by Macronix International Co., Ltd.
 
-compatible: "irnas,en25"
+compatible: "mxicy,en25"
 
 include: [spi-device.yaml]
 

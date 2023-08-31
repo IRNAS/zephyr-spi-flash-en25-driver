@@ -4,7 +4,7 @@
 	en25qh32b: en25qh32b@1 {
 		reg = <1>;
 		status = "okay";
-		compatible = "irnas,en25";
+		compatible = "mxicy,en25";
 
 		jedec-id = [ 1c 70 16  ];  // EN25
 		size = <(4194304 * 8)>;

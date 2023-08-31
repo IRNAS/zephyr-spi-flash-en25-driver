@@ -17,7 +17,7 @@
 
 LOG_MODULE_REGISTER(spi_flash_en25, CONFIG_FLASH_LOG_LEVEL);
 
-#define DT_DRV_COMPAT irnas_en25
+#define DT_DRV_COMPAT mxicy_en25
 
 /* EN25 commands used by this driver: */
 /* - Main Memory Byte/Page Program through Buffer 1 without Built-In Erase */
@@ -894,8 +894,6 @@ static const struct flash_driver_api spi_flash_en25_api = {
 #endif
 };
 
-#define DT_DRV_COMPAT irnas_en25
-
 #define XSTR(x) STR(x)
 #define STR(x)	#x
 
@@ -970,7 +968,7 @@ static const struct flash_driver_api spi_flash_en25_api = {
 		   (BUILD_ASSERT((INST_##idx##_PAGES * DT_INST_PROP(idx, erase_sector_size)) ==    \
 					 INST_##idx##_BYTES,                                       \
 				 "erase-sector-size specified for instance " #idx " of "           \
-				 "irnas,en25 is not compatible with its "                          \
+				 "mxicy,en25 is not compatible with its "                          \
 				 "total size");))                                                  \
 	PM_DEVICE_DT_INST_DEFINE(idx, spi_flash_en25_pm_control);                                  \
                                                                                                    \

@@ -1,0 +1,7 @@
+tests:
+  tests.flash.flash_read_write:
+    # Set of platforms that this test case can be run on.
+    platform_allow: nrf52840dk_nrf52840
+    harness: ztest
+    # Only build the test, do not run it
+    build_only: True
