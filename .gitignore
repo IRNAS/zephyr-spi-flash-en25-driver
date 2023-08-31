@@ -10,3 +10,4 @@ __pycache__
 *.pdf
 .cache
 generated
+!.github/workflows/build.yaml
