@@ -14,43 +14,23 @@
 #define TEST_REGION_OFFSET (ERASE_SECTOR_SIZE * 4)
 /* The size of test region must also be a multiple of the erase-sector-size, for the same reason */
 #define TEST_REGION_SIZE   (ERASE_SECTOR_SIZE * 2)
-
-#define ERASE_BUF_SIZE ERASE_SECTOR_SIZE
+#define ERASE_BUF_SIZE	   ERASE_SECTOR_SIZE
 
 /* Define stattically so not a lot of additional stack space is required */
 static uint8_t write_buf[TEST_REGION_SIZE];
 static uint8_t read_buf[TEST_REGION_SIZE];
 static uint8_t erase_check_buf[ERASE_BUF_SIZE];
 
-static void test_get_binding()
-{
-	const struct device *flash_dev;
-	flash_dev = DEVICE_DT_GET(DT_NODELABEL(en25qh32b));
-	zassert_not_null(flash_dev, "Returned device is null");
+const struct device *flash_dev = DEVICE_DT_GET(DT_NODELABEL(en25qh32b));
 
-	if (strcmp(CONFIG_BOARD, "nrf9160dk_nrf9160") == 0) {
-		const struct device *gpio_dev;
-		gpio_dev = device_get_binding("GPIO_0");
-		gpio_pin_configure(gpio_dev, 16, GPIO_OUTPUT); // LR1110 reset
-		gpio_pin_configure(gpio_dev, 18, GPIO_OUTPUT); // LR1110 nss
-		gpio_pin_configure(gpio_dev, 19, GPIO_OUTPUT); // LR1110 pwr en
-		gpio_pin_set(gpio_dev, 16, 1);
-		gpio_pin_set(gpio_dev, 18, 1);
-		gpio_pin_set(gpio_dev, 19, 1);
-	}
-}
+ZTEST_SUITE(flash_test_suite, NULL, NULL, NULL, NULL, NULL);
 
-static void test_full_erase_full_read_write()
+ZTEST(flash_test_suite, test_full_erase_full_read_write)
 {
-	const struct device *flash_dev;
-	int i, j;
 	int err;
 	uint8_t data;
 	struct flash_pages_info pages_info;
 	size_t page_count, chip_size;
-
-	flash_dev = DEVICE_DT_GET(DT_NODELABEL(en25qh32b));
-	zassert_not_null(flash_dev, "Returned device is null");
 
 	page_count = flash_get_page_count(flash_dev);
 	(void)flash_get_page_info_by_idx(flash_dev, 0, &pages_info);
@@ -70,10 +50,10 @@ static void test_full_erase_full_read_write()
 
 	printk(" INFO - Checking that everything was erased, this will take some "
 	       "time...\n");
-	for (i = 0; i < page_count; i++) {
+	for (int i = 0; i < page_count; i++) {
 		err = flash_read(flash_dev, ERASE_BUF_SIZE * i, erase_check_buf, ERASE_BUF_SIZE);
 		zassert_equal(err, 0, "Flash read failed at i: %d", i);
-		for (j = 0; j < ERASE_BUF_SIZE; j++) {
+		for (int j = 0; j < ERASE_BUF_SIZE; j++) {
 			zassert_equal(erase_check_buf[j], 0xFF,
 				      "ERROR at erase_check_buf[%d]: expected 0x%02X, got "
 				      "0x%02X\n,\n i is: %d",
@@ -83,24 +63,24 @@ static void test_full_erase_full_read_write()
 
 	printk(" INFO - Writing entire flash with dummy values, this will take some "
 	       "time...\n");
-	for (i = 0; i < ERASE_BUF_SIZE; ++i) {
+	for (int i = 0; i < ERASE_BUF_SIZE; ++i) {
 		erase_check_buf[i] = i;
 	}
-	for (i = 0; i < page_count; i++) {
+	for (int i = 0; i < page_count; i++) {
 		err = flash_write(flash_dev, ERASE_BUF_SIZE * i, erase_check_buf, ERASE_BUF_SIZE);
 		zassert_equal(err, 0, "Flash write failed at i: %d", i);
 	}
 
 	/* Empty buffer just in case*/
-	for (i = 0; i < ERASE_BUF_SIZE; ++i) {
+	for (int i = 0; i < ERASE_BUF_SIZE; ++i) {
 		erase_check_buf[i] = 0;
 	}
 
 	printk(" INFO - Reading entire flash, this will take some time...\n");
-	for (i = 0; i < page_count; i++) {
+	for (int i = 0; i < page_count; i++) {
 		err = flash_read(flash_dev, ERASE_BUF_SIZE * i, erase_check_buf, ERASE_BUF_SIZE);
 		zassert_equal(err, 0, "Flash read failed at i: %d", i);
-		for (j = 0; j < ERASE_BUF_SIZE; j++) {
+		for (int j = 0; j < ERASE_BUF_SIZE; j++) {
 			zassert_equal(erase_check_buf[j], (uint8_t)j,
 				      "ERROR at erase_check_buf[%d]: expected 0x%02X, got "
 				      "0x%02X\n,\n i is: %d",
@@ -109,17 +89,12 @@ static void test_full_erase_full_read_write()
 	}
 }
 
-static void test_erase_read_write()
+ZTEST(flash_test_suite, test_erase_read_write)
 {
-	const struct device *flash_dev;
-	int i;
 	int err;
 	uint8_t data;
 	struct flash_pages_info pages_info;
 	size_t page_count, chip_size;
-
-	flash_dev = DEVICE_DT_GET(DT_NODELABEL(en25qh32b));
-	zassert_not_null(flash_dev, "Returned device is null");
 
 	page_count = flash_get_page_count(flash_dev);
 	(void)flash_get_page_info_by_idx(flash_dev, 0, &pages_info);
@@ -133,7 +108,7 @@ static void test_erase_read_write()
 	zassert_equal(err, 0, "Flash read failed");
 
 	++data;
-	for (i = 0; i < TEST_REGION_SIZE; ++i) {
+	for (int i = 0; i < TEST_REGION_SIZE; ++i) {
 		write_buf[i] = (uint8_t)(data + i);
 	}
 
@@ -143,7 +118,7 @@ static void test_erase_read_write()
 	err = flash_read(flash_dev, TEST_REGION_OFFSET, read_buf, TEST_REGION_SIZE);
 	zassert_equal(err, 0, "Flash read failed");
 
-	for (i = 0; i < TEST_REGION_SIZE; ++i) {
+	for (int i = 0; i < TEST_REGION_SIZE; ++i) {
 		zassert_equal(read_buf[i], 0xFF,
 			      "ERROR at read_buf[%d]: expected 0x%02X, got 0x%02X\n", i, 0xFF,
 			      read_buf[i]);
@@ -155,7 +130,7 @@ static void test_erase_read_write()
 	err = flash_read(flash_dev, TEST_REGION_OFFSET, read_buf, TEST_REGION_SIZE);
 	zassert_equal(err, 0, "Flash read failed");
 
-	for (i = 0; i < TEST_REGION_SIZE; ++i) {
+	for (int i = 0; i < TEST_REGION_SIZE; ++i) {
 		zassert_equal(read_buf[i], write_buf[i],
 			      "ERROR at read_buf[%d]: expected 0x%02X, got 0x%02X\n", i,
 			      write_buf[i], read_buf[i]);
@@ -168,7 +143,7 @@ static void test_erase_read_write()
 
 static uint8_t __aligned(4) expected[EXPECTED_SIZE];
 
-static void test_setup1(void)
+ZTEST(flash_test_suite, test_setup1)
 {
 	int rc;
 	const struct device *flash_dev;
@@ -212,7 +187,7 @@ static void test_setup1(void)
 	}
 }
 
-static void test_read_unaligned_address(void)
+ZTEST(flash_test_suite, test_read_unaligned_address)
 {
 	int rc;
 	uint8_t buf[EXPECTED_SIZE];
@@ -257,26 +232,11 @@ static void test_read_unaligned_address(void)
 	}
 }
 
-static void test_low_power()
+ZTEST(flash_test_suite, test_low_power)
 {
-	const struct device *flash_dev;
-	int err;
-	flash_dev = DEVICE_DT_GET(DT_NODELABEL(en25qh32b));
-
 #if IS_ENABLED(CONFIG_PM_DEVICE)
 	printk("Putting the flash device into low power state...\n");
-	err = pm_device_action_run(flash_dev, PM_DEVICE_ACTION_SUSPEND);
+	int err = pm_device_action_run(flash_dev, PM_DEVICE_ACTION_SUSPEND);
 	zassert_equal(err, 0, "Setting low power mode failed");
 #endif
-}
-
-void test_main(void)
-{
-	ztest_test_suite(flash_driver_test, ztest_unit_test(test_get_binding),
-			 ztest_unit_test(test_erase_read_write),
-			 ztest_unit_test(test_full_erase_full_read_write),
-			 ztest_unit_test(test_setup1), ztest_unit_test(test_read_unaligned_address),
-			 ztest_unit_test(test_low_power));
-
-	ztest_run_test_suite(flash_driver_test);
 }
