@@ -1,6 +1,7 @@
 # Zepyhr SPi flash driver for EN25QH32B-104HIP2C flash chip
 
-This repository contains driver and tests for interfacing with EN25QH32B-104HIP2C via the zephyr flash API.
+This repository contains driver and tests for interfacing with
+EN25QH32B-104HIP2C via the zephyr flash API.
 
 This drive is compatible with the following flash chips:
 
@@ -11,33 +12,25 @@ This drive is compatible with the following flash chips:
 
 ## Setup
 
-Before you get started, you'll need to install the nRF Connect SDK. Here are the full instructions:
-
-* [Windows, Linux](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/getting_started.html)
-
-If you already have a NCS setup you can follow these steps:
-
-1. To get the driver we need to update `<path to ncs>/ncs/nrf/west.yml`. First in the `remotes` section add:
+1. To your `west.yml` add the irnas remote to the `remotes` section:
 
    ```yaml
-    - name: irnas
-      url-base: https://github.com/irnas
+   - name: irnas
+     url-base: https://github.com/irnas
    ```
 
 2. Then in the `projects` section add at the bottom:
 
-    ```yaml
-    - name: zephyr-spi-flash-en25-driver
-      repo-path: zephyr-spi-flash-en25-driver
-      path: irnas/zephyr-spi-flash-en25-driver
-      remote: irnas
-      revision: <revision>
-    ```
+   ```yaml
+   - name: zephyr-spi-flash-en25-driver
+     repo-path: zephyr-spi-flash-en25-driver
+     path: irnas/zephyr-spi-flash-en25-driver
+     remote: irnas
+     revision: <revision>
+   ```
 
-3. Then run `west update` in your freshly created bash/command prompt session.
-4. Above command will clone `zephyr-spi-flash-en25-driver` repository inside of `ncs/irnas/`. You can now run samples inside it and use its en25 driver code in your application projects.
-
-5. Add the flash DTS entry to your board definition or overlay file. For example:
+3. Add the flash DTS entry to your board definition or overlay file. For
+   example:
 
 ```dts
 
@@ -48,7 +41,7 @@ If you already have a NCS setup you can follow these steps:
         reg = <0>;
         label = "EN25QH32B";
         status = "okay";
-        compatible = "irnas,en25";
+        compatible = "mxicy,en25";
 
         jedec-id = [ 1c 70 16  ];  // EN25
         size = <(4194304 * 8)>;
@@ -72,11 +65,15 @@ If you already have a NCS setup you can follow these steps:
 
 ## External mutex
 
-This driver can be used on multiple MCUs to use the same SPI flash peripheral. To achieve this, a GPIO line must be shared between the MCUs,
-the flash chip must be the only peripheral on this SPI bus and both MCUs must be using this driver to communicate with the external flash.
-To enable this feature, add `ext-mutex-gpios`, `ext-mutex-role` and `spi-clk-gpios` to the DTS flash definition.
+This driver can be used on multiple MCUs to use the same SPI flash peripheral.
+To achieve this, a GPIO line must be shared between the MCUs, the flash chip
+must be the only peripheral on this SPI bus and both MCUs must be using this
+driver to communicate with the external flash. To enable this feature, add
+`ext-mutex-gpios`, `ext-mutex-role` and `spi-clk-gpios` to the DTS flash
+definition.
 
-For two MCUs, set one `ext-mutex-role` to `master` and one to `slave`. For more than 2 MCUs, set one to `master` and all others to `slave`.
+For two MCUs, set one `ext-mutex-role` to `master` and one to `slave`. For more
+than 2 MCUs, set one to `master` and all others to `slave`.
 
 For example:
 
@@ -95,11 +92,14 @@ For example:
 };
 
 ```
-The setting `SPI_FLASH_EN25_EXTERNAL_MUTEX_TIMEOUT` can also be configured to specify the amount of time
-a MCU is willing to wait for the SPI lock to be released.
+
+The setting `SPI_FLASH_EN25_EXTERNAL_MUTEX_TIMEOUT` can also be configured to
+specify the amount of time a MCU is willing to wait for the SPI lock to be
+released.
 
 ## Tests
 
 1. Navigate to `./tests/flash_read_write`
-2. Build for one of the boards with supplied overlay, of make your own. Use `west build -b nrf52840dk_nrf52811` for example.
+2. Build for one of the boards with supplied overlay, of make your own. Use
+   `west build -b nrf52840dk_nrf52840` for example.
 3. flash with `west flash`
