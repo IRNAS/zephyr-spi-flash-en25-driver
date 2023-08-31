@@ -751,7 +751,7 @@ static int spi_flash_en25_init(const struct device *dev)
 	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
 	int err;
 
-	if (!spi_is_ready(&dev_config->bus)) {
+	if (!spi_is_ready_dt(&dev_config->bus)) {
 		LOG_ERR("SPI bus %s not ready", dev_config->bus.bus->name);
 		return -ENODEV;
 	}
@@ -957,9 +957,8 @@ static const struct flash_driver_api spi_flash_en25_api = {
 		.erase_full_block_size = DT_INST_PROP(idx, erase_full_block_size),                 \
 		.erase_half_block_size = DT_INST_PROP(idx, erase_half_block_size),                 \
 		.erase_sector_size = DT_INST_PROP(idx, erase_sector_size),                         \
-		.t_enter_dpd =                                                                     \
-			ceiling_fraction(DT_INST_PROP(idx, enter_dpd_delay), NSEC_PER_USEC),       \
-		.t_exit_dpd = ceiling_fraction(DT_INST_PROP(idx, exit_dpd_delay), NSEC_PER_USEC),  \
+		.t_enter_dpd = DIV_ROUND_UP(DT_INST_PROP(idx, enter_dpd_delay), NSEC_PER_USEC),    \
+		.t_exit_dpd = DIV_ROUND_UP(DT_INST_PROP(idx, exit_dpd_delay), NSEC_PER_USEC),      \
 		.use_udpd = DT_INST_PROP(idx, use_udpd),                                           \
 		.jedec_id = DT_INST_PROP(idx, jedec_id),                                           \
 		IF_ENABLED(INST_HAS_EXT_MUTEX_GPIO(idx), (.ext_mutex = &ext_mutex_##idx, ))        \

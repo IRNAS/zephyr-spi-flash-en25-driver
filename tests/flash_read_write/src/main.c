@@ -1,13 +1,12 @@
-#include <devicetree.h>
-#include <drivers/flash.h>
-#include <drivers/gpio.h>
-#include <logging/log_ctrl.h>
-#include <pm/device.h>
-#include <storage/flash_map.h>
-#include <zephyr.h>
-#include <ztest.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/flash.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/storage/flash_map.h>
+#include <zephyr/ztest.h>
 
-#define FLASH_DEVICE	  DT_LABEL(DT_NODELABEL(en25qh32b))
 #define CHIP_SIZE_BITS	  DT_PROP(DT_NODELABEL(en25qh32b), size)
 #define ERASE_SECTOR_SIZE DT_PROP(DT_NODELABEL(en25qh32b), erase_sector_size)
 
@@ -26,7 +25,7 @@ static uint8_t erase_check_buf[ERASE_BUF_SIZE];
 static void test_get_binding()
 {
 	const struct device *flash_dev;
-	flash_dev = device_get_binding(FLASH_DEVICE);
+	flash_dev = DEVICE_DT_GET(DT_NODELABEL(en25qh32b));
 	zassert_not_null(flash_dev, "Returned device is null");
 
 	if (strcmp(CONFIG_BOARD, "nrf9160dk_nrf9160") == 0) {
@@ -50,7 +49,7 @@ static void test_full_erase_full_read_write()
 	struct flash_pages_info pages_info;
 	size_t page_count, chip_size;
 
-	flash_dev = device_get_binding(FLASH_DEVICE);
+	flash_dev = DEVICE_DT_GET(DT_NODELABEL(en25qh32b));
 	zassert_not_null(flash_dev, "Returned device is null");
 
 	page_count = flash_get_page_count(flash_dev);
@@ -119,7 +118,7 @@ static void test_erase_read_write()
 	struct flash_pages_info pages_info;
 	size_t page_count, chip_size;
 
-	flash_dev = device_get_binding(FLASH_DEVICE);
+	flash_dev = DEVICE_DT_GET(DT_NODELABEL(en25qh32b));
 	zassert_not_null(flash_dev, "Returned device is null");
 
 	page_count = flash_get_page_count(flash_dev);
@@ -175,7 +174,7 @@ static void test_setup1(void)
 	const struct device *flash_dev;
 	struct flash_pages_info page_info;
 
-	flash_dev = device_get_binding(FLASH_DEVICE);
+	flash_dev = DEVICE_DT_GET(DT_NODELABEL(en25qh32b));
 	const struct flash_parameters *flash_parameters = flash_get_parameters(flash_dev);
 
 	/* For tests purposes use page (in nrf_qspi_nor page = 64 kB) */
@@ -220,7 +219,7 @@ static void test_read_unaligned_address(void)
 	const struct device *flash_dev;
 	struct flash_pages_info page_info;
 
-	flash_dev = device_get_binding(FLASH_DEVICE);
+	flash_dev = DEVICE_DT_GET(DT_NODELABEL(en25qh32b));
 
 	flash_get_page_info_by_offs(flash_dev, TEST_REGION_OFFSET, &page_info);
 
@@ -262,7 +261,7 @@ static void test_low_power()
 {
 	const struct device *flash_dev;
 	int err;
-	flash_dev = device_get_binding(FLASH_DEVICE);
+	flash_dev = DEVICE_DT_GET(DT_NODELABEL(en25qh32b));
 
 #if IS_ENABLED(CONFIG_PM_DEVICE)
 	printk("Putting the flash device into low power state...\n");
