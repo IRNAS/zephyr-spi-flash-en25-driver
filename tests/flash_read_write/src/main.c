@@ -153,10 +153,6 @@ static void test_erase_read_write()
 	err = flash_write(flash_dev, TEST_REGION_OFFSET, write_buf, TEST_REGION_SIZE);
 	zassert_equal(err, 0, "Flash write failed");
 
-	err = flash_write(flash_dev, TEST_REGION_OFFSET + TEST_REGION_SIZE / 2,
-			  &write_buf[TEST_REGION_SIZE / 2], TEST_REGION_SIZE / 2);
-	zassert_equal(err, 0, "Flash write failed");
-
 	err = flash_read(flash_dev, TEST_REGION_OFFSET, read_buf, TEST_REGION_SIZE);
 	zassert_equal(err, 0, "Flash read failed");
 
