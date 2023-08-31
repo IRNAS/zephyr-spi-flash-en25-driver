@@ -751,7 +751,7 @@ static int spi_flash_en25_init(const struct device *dev)
 	const struct spi_flash_en25_config *dev_config = get_dev_config(dev);
 	int err;
 
-	if (!spi_is_ready(&dev_config->bus)) {
+	if (!spi_is_ready_dt(&dev_config->bus)) {
 		LOG_ERR("SPI bus %s not ready", dev_config->bus.bus->name);
 		return -ENODEV;
 	}
