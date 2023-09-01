@@ -46,12 +46,12 @@ pre-build:
 
 build:
 	# Change east.yml to control what is built.
-	east release
+	# east release
 
 # Pre-package target is only run in release process.
 pre-package:
 	mkdir -p artefacts
-	cp release/*.zip artefacts
+	# cp release/*.zip artefacts
 	cp scripts/pre_changelog.md artefacts
 	cp scripts/post_changelog.md artefacts
 
