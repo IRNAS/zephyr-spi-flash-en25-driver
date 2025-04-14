@@ -1,3 +1,7 @@
+> [!WARNING]  
+> This driver is deprecated. Use the one [provided by Zephyr](https://docs.zephyrproject.org/latest/build/dts/api/bindings/mtd/jedec%2Cspi-nor.html) instead.
+> The only reason to keep using this is if EXTERNAL MUTEX functionality is required.
+
 # Zepyhr SPi flash driver for EN25QH32B-104HIP2C flash chip
 
 This repository contains driver and tests for interfacing with
